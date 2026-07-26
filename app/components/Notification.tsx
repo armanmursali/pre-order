@@ -3,6 +3,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
+import { useRouter } from 'next/navigation';
+// [HELPER AKSI]: Memanggil penanganan klik notifikasi secara modular
+import { handleNotificationClick } from '@/utils/notificationActionHelper';
 
 interface NotificationProps {
   isOpen: boolean;
@@ -20,6 +23,7 @@ interface NotifItem {
 
 export default function Notification({ isOpen, onClose }: NotificationProps) {
   const supabase = createClient();
+  const router = useRouter();
   const [notifs, setNotifs] = useState<NotifItem[]>([]);
   const [flashToast, setFlashToast] = useState<string | null>(null);
 
@@ -32,7 +36,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
 
       const userId = session.user.id;
 
-      // Ambil data notifikasi awal
+      // [LOGIKA UTAMA]: Mengambil data notifikasi awal
       fetchNotifData(userId);
 
       // [REALTIME SUPABASE]: Mendengarkan perubahan data pada tabel notifikasi secara langsung tanpa reload
@@ -50,7 +54,6 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
             const newNotif = payload.new as NotifItem;
             setNotifs((prev) => [newNotif, ...prev]);
             
-            // Tampilkan Flash Toast saat ada notifikasi baru masuk
             setFlashToast(newNotif.message);
             setTimeout(() => {
               setFlashToast(null);
@@ -153,6 +156,13 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
     }
   };
 
+  // [PANGGIL HELPER AKSI]: Menjalankan fungsi helper saat tombol aksi notifikasi diklik
+  const handleItemClick = async (notif: NotifItem) => {
+    await markAsRead(notif.id);
+    onClose();
+    handleNotificationClick(notif, router);
+  };
+
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' - ' + date.toLocaleDateString();
@@ -228,21 +238,31 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
                 </div>
                 <p className="text-xs sm:text-sm leading-relaxed mb-3">{notif.message}</p>
 
-                <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-200/60 text-xs">
-                  {!notif.is_read && (
-                    <button
-                      onClick={() => markAsRead(notif.id)}
-                      className="text-blue-600 hover:text-blue-800 font-medium transition-colors"
-                    >
-                      Tandai dibaca
-                    </button>
-                  )}
+                <div className="flex items-center justify-between pt-2 border-t border-gray-200/60 text-xs">
+                  {/* [NAVIGASI HELPER CALL]: Memanggil fungsi helper saat tombol diklik */}
                   <button
-                    onClick={() => deleteNotif(notif.id)}
-                    className="text-red-500 hover:text-red-700 font-medium transition-colors"
+                    onClick={() => handleItemClick(notif)}
+                    className="text-amber-800 hover:text-amber-900 font-bold transition-colors flex items-center gap-1"
                   >
-                    Hapus
+                    <i className="fa-solid fa-store"></i> Lihat Toko
                   </button>
+
+                  <div className="flex items-center gap-3">
+                    {!notif.is_read && (
+                      <button
+                        onClick={() => markAsRead(notif.id)}
+                        className="text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                      >
+                        Tandai dibaca
+                      </button>
+                    )}
+                    <button
+                      onClick={() => deleteNotif(notif.id)}
+                      className="text-red-500 hover:text-red-700 font-medium transition-colors"
+                    >
+                      Hapus
+                    </button>
+                  </div>
                 </div>
               </div>
             ))
@@ -250,7 +270,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
         </div>
       </div>
 
-      {/* Flash Toast Real-Time (Perbaikan penulisan kelas ikon fa-bell) */}
+      {/* Flash Toast Real-Time */}
       {flashToast && (
         <div className="fixed bottom-6 right-6 z-[200] animate-bounce">
           <div className="flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl bg-amber-800 text-white font-medium border border-amber-700">

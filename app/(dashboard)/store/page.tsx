@@ -4,7 +4,8 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
-import { sendNotification } from '@/utils/notificationHelper';
+// [BARU]: Mengimpor helper terpisah untuk mengirim pesan permintaan masuk toko
+import { kirimpesanpermintaanmasuktoko } from '@/utils/kirimpesanpermintaanmasuktoko';
 
 interface Kategori {
   id: string;
@@ -56,7 +57,6 @@ export default function StorePage() {
     previewFoto: '' as string,
   });
 
-  // [REALTIME DUA ARAH STORE]: Mendengarkan perubahan data tabel toko secara langsung agar status user terbarui instan
   useEffect(() => {
     let channel: any;
 
@@ -268,10 +268,13 @@ export default function StorePage() {
 
       if (updateError) throw updateError;
 
-      await sendNotification(
+      // [BARU]: Memanggil helper kirimpesanpermintaanmasuktoko
+      await kirimpesanpermintaanmasuktoko(
         targetToko.user_id,
-        'Permintaan Gabung Toko',
-        `Pengguna "${userName}" (${userEmail}) meminta untuk bergabung ke toko "${targetToko.nama}".`
+        targetToko.id,
+        targetToko.nama,
+        userName,
+        userEmail
       );
 
       showToast(`Permintaan gabung ke toko "${targetToko.nama}" dikirim (Status: Pending)!`, 'success');
@@ -549,7 +552,6 @@ export default function StorePage() {
         </div>
       )}
 
-      {/* Modal Tambah/Edit Toko dengan perbaikan warna teks input (text-gray-900 bg-white) */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
@@ -653,7 +655,6 @@ export default function StorePage() {
         </div>
       )}
 
-      {/* Modal Gabung Toko dengan perbaikan warna teks input */}
       {isJoinModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col">
@@ -704,7 +705,6 @@ export default function StorePage() {
         </div>
       )}
 
-      {/* Modal Hapus Toko dengan perbaikan warna teks input */}
       {isDeleteModalOpen && tokoToDelete && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
