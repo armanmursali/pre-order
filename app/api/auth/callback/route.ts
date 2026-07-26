@@ -9,8 +9,11 @@ export async function GET(request: Request) {
   const cookieStore = await cookies();
   
  
-  const rawNext = requestUrl.searchParams.get('next') || cookieStore.get('redirectTo')?.value;
-  const next = rawNext ? decodeURIComponent(rawNext) : '/beranda';
+  const redirectToCookie = cookieStore.get('redirectTo')?.value;
+  const queryNext = requestUrl.searchParams.get('next');
+  
+
+  const next = queryNext ? decodeURIComponent(queryNext) : (redirectToCookie ? decodeURIComponent(redirectToCookie) : '/beranda');
   
   const origin = requestUrl.origin;
 
@@ -29,7 +32,7 @@ export async function GET(request: Request) {
                 cookieStore.set(name, value, options)
               );
             } catch {
-       
+             
             }
           },
         },
@@ -39,7 +42,7 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     
     if (!error) {
-    
+     
       const response = NextResponse.redirect(`${origin}${next}`);
       response.cookies.delete('redirectTo');
       return response;
