@@ -42,10 +42,12 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
+  
+  // [PERBAIKAN KUNCI]: Memeriksa apakah URL memiliki parameter 'code' (OAuth callback dari Supabase/Google)
+  const hasAuthCode = request.nextUrl.searchParams.has('code');
 
-  // [PERBAIKAN DINAMIS]: Menentukan halaman publik yang boleh diakses tanpa login (misal: /login, /landing, dll)
-  // Segala rute di luar daftar publik ini (termasuk semua menu di dalam (dashboard) seperti /beranda, /store, dan rute masa depan) otomatis dianggap privat.
-  const isPublicRoute = path === '/login' || path === '/';
+  // Menentukan halaman publik yang boleh diakses tanpa login
+  const isPublicRoute = path === '/login' || path === '/' || hasAuthCode;
 
   // Pengamanan rute: Jika pengguna belum login dan mencoba mengakses halaman selain rute publik, lempar ke /login
   if (!user && !isPublicRoute) {
@@ -54,8 +56,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Jika pengguna sudah login dan mencoba mengakses halaman /login, arahkan otomatis ke /beranda
-  if (user && path === '/login') {
+  // Jika pengguna sudah login dan mencoba mengakses halaman /login (tetapi tidak sedang membawa callback code), arahkan ke /beranda
+  if (user && path === '/login' && !hasAuthCode) {
     const url = request.nextUrl.clone();
     url.pathname = '/beranda';
     return NextResponse.redirect(url);
