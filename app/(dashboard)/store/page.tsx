@@ -428,16 +428,16 @@ export default function StorePage() {
           <p>Belum ada data toko. Silakan tambahkan toko baru atau gabung ke toko lain.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 px-2 sm:px-0">
+        /* [PERUBAHAN PRESISI]: Mengubah grid menjadi 2 kolom di mobile (grid-cols-2) agar card bersampingan */
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 px-1 sm:px-0">
           {tokos.map((toko) => {
             const isPending = toko.status_keanggotaan === 'pending';
             
             return (
-              /* [PENYESUAIAN MOBILE]: Mengurangi ukuran card toko secara responsif pada perangkat seluler */
-              <div key={toko.id} className="relative bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-orange-200 transition-all group flex flex-col overflow-hidden max-w-[240px] sm:max-w-none mx-auto sm:mx-0 w-full">
+              <div key={toko.id} className="relative bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-orange-200 transition-all group flex flex-col overflow-hidden">
                 
-                <div className="absolute top-3 left-3 z-10">
-                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm ${
+                <div className="absolute top-2 left-2 z-10">
+                  <span className={`px-2 py-0.5 rounded-full text-[8px] sm:text-[10px] font-bold uppercase tracking-wider shadow-sm ${
                     toko.status_keanggotaan === 'pemilik' 
                       ? 'bg-amber-800 text-white' 
                       : toko.status_keanggotaan === 'tergabung' 
@@ -449,7 +449,7 @@ export default function StorePage() {
                 </div>
 
                 {toko.status_keanggotaan === 'pemilik' && (
-                  <div className="absolute top-3 right-3 z-10">
+                  <div className="absolute top-2 right-2 z-10">
                     <div className="relative inline-block text-left">
                       <button
                         onClick={(e) => {
@@ -457,7 +457,7 @@ export default function StorePage() {
                           e.stopPropagation();
                           setActiveDropdown(activeDropdown === toko.id ? null : toko.id);
                         }}
-                        className="w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm text-gray-600 hover:bg-orange-100 hover:text-orange-700 flex items-center justify-center transition-colors shadow-sm border border-gray-100"
+                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/90 backdrop-blur-sm text-gray-600 hover:bg-orange-100 hover:text-orange-700 flex items-center justify-center transition-colors shadow-sm border border-gray-100 text-xs sm:text-sm"
                         title="Aksi"
                       >
                         <i className="fa-solid fa-ellipsis-vertical"></i>
@@ -503,18 +503,18 @@ export default function StorePage() {
                       )}
                     </div>
                     <div className="p-3 sm:p-5 flex flex-col flex-grow">
-                      <div className="flex flex-col gap-1 mb-2 sm:mb-3">
+                      <div className="flex flex-col gap-1 mb-1.5 sm:mb-3">
                         <span className="w-fit bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-[8px] sm:text-[10px] font-bold uppercase tracking-wider">
                           {toko.kategori_toko?.nama || 'Tanpa Kategori'}
                         </span>
-                        <h3 className="text-sm sm:text-lg font-bold text-amber-900 line-clamp-1">
+                        <h3 className="text-xs sm:text-lg font-bold text-amber-900 line-clamp-1">
                           {toko.nama}
                         </h3>
                       </div>
-                      <p className="text-[11px] sm:text-sm text-yellow-600 font-medium italic mb-2">
+                      <p className="text-[10px] sm:text-sm text-yellow-600 font-medium italic mb-1.5">
                         Menunggu persetujuan pemilik toko...
                       </p>
-                      <p className="text-[11px] sm:text-sm text-gray-500 line-clamp-2 leading-relaxed">
+                      <p className="text-[10px] sm:text-sm text-gray-500 line-clamp-2 leading-relaxed">
                         {toko.deskripsi ? toko.deskripsi : <span className="italic">Tidak ada deskripsi.</span>}
                       </p>
                     </div>
@@ -532,16 +532,16 @@ export default function StorePage() {
                     </div>
                     
                     <div className="p-3 sm:p-5 flex flex-col flex-grow">
-                      <div className="flex flex-col gap-1 mb-2 sm:mb-3">
+                      <div className="flex flex-col gap-1 mb-1.5 sm:mb-3">
                         <span className="w-fit bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-[8px] sm:text-[10px] font-bold uppercase tracking-wider">
                           {toko.kategori_toko?.nama || 'Tanpa Kategori'}
                         </span>
-                        <h3 className="text-sm sm:text-lg font-bold text-amber-900 group-hover:text-orange-700 transition-colors line-clamp-1">
+                        <h3 className="text-xs sm:text-lg font-bold text-amber-900 group-hover:text-orange-700 transition-colors line-clamp-1">
                           {toko.nama}
                         </h3>
                       </div>
                       
-                      <p className="text-[11px] sm:text-sm text-gray-500 line-clamp-3 leading-relaxed">
+                      <p className="text-[10px] sm:text-sm text-gray-500 line-clamp-3 leading-relaxed">
                         {toko.deskripsi ? toko.deskripsi : <span className="italic">Tidak ada deskripsi.</span>}
                       </p>
                     </div>
