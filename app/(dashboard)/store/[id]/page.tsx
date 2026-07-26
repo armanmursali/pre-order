@@ -21,7 +21,9 @@ interface TokoDetail {
 interface AnggotaToko {
   id: string;
   user_id: string;
-  status: string; // 'pending', 'tergabung', 'pemilik'
+  status: string;
+  nama_user?: string; // [PERBAIKAN]: Menampung nama user
+  email_user?: string; // [PERBAIKAN]: Menampung email user
 }
 
 interface JenisProduk {
@@ -51,8 +53,8 @@ export default function StoreDetailPage() {
   const [isOwner, setIsOwner] = useState<boolean>(false);
 
   const [anggotas, setAnggotas] = useState<AnggotaToko[]>([]);
-  const [isMemberListOpen, setIsMemberListOpen] = useState<boolean>(false); // [BARU]: Default tertutup untuk list anggota di mobile/desktop
-  const [activeMemberDropdown, setActiveMemberDropdown] = useState<string | null>(null); // [BARU]: Dropdown titik tiga untuk aksi member
+  const [isMemberListOpen, setIsMemberListOpen] = useState<boolean>(false); 
+  const [activeMemberDropdown, setActiveMemberDropdown] = useState<string | null>(null); 
 
   const [produks, setProduks] = useState<Produk[]>([]);
   const [jenisProduks, setJenisProduks] = useState<JenisProduk[]>([]);
@@ -105,7 +107,6 @@ export default function StoreDetailPage() {
         return;
       }
       
-      // 1. Ambil detail toko
       const { data: dataToko, error: errorToko } = await supabase
         .from('toko')
         .select('*, kategori_toko(nama)')
@@ -118,7 +119,6 @@ export default function StoreDetailPage() {
         return;
       }
 
-      // 2. Periksa apakah user adalah pemilik utama (di tabel toko) atau pemilik/anggota di tabel user_toko
       const { data: membership } = await supabase
         .from('user_toko')
         .select('status')
@@ -141,15 +141,23 @@ export default function StoreDetailPage() {
 
       setToko(dataToko);
 
-      // 3. Ambil seluruh daftar anggota toko (termasuk pemilik tambahan dan pending)
+      // [PERBAIKAN]: Mengambil daftar anggota toko beserta relasi ke tabel public.users (nama & email) jika tersedia
       const { data: dataAnggota } = await supabase
         .from('user_toko')
-        .select('*')
+        .select('*, users(nama, email)')
         .eq('toko_id', tokoId);
       
-      if (dataAnggota) setAnggotas(dataAnggota);
+      if (dataAnggota) {
+        const formattedAnggota = dataAnggota.map((item: any) => ({
+          id: item.id,
+          user_id: item.user_id,
+          status: item.status,
+          nama_user: item.users?.nama || 'Pengguna Tanpa Nama',
+          email_user: item.users?.email || 'Email tidak tersedia',
+        }));
+        setAnggotas(formattedAnggota);
+      }
 
-      // 4. Ambil jenis produk dan produk toko
       const { data: dataJenis } = await supabase
         .from('jenis_produk')
         .select('*')
@@ -172,7 +180,6 @@ export default function StoreDetailPage() {
     }
   };
 
-  // [BARU]: Fungsi manajemen status anggota (Terima, Ubah Jadi Pemilik, Keluarkan)
   const handleUpdateAnggotaStatus = async (anggotaId: string, newStatus: string) => {
     try {
       setIsSubmitting(true);
@@ -379,12 +386,12 @@ export default function StoreDetailPage() {
         />
       )}
 
-      {/* [BARU]: Panel Anggota Toko di dalam komponen detail toko, default tertutup dan responsif mobile */}
+      {/* [PERBAIKAN TAMPILAN]: Membuka batasan overflow agar tombol aksi titik tiga tidak terpotong */}
       {isOwner && (
-        <div className="bg-amber-50/60 rounded-xl shadow-sm border border-amber-200 overflow-hidden">
+        <div className="bg-amber-50/60 rounded-xl shadow-sm border border-amber-200">
           <button
             onClick={() => setIsMemberListOpen(!isMemberListOpen)}
-            className="w-full px-4 sm:px-6 py-3.5 flex items-center justify-between text-left font-bold text-amber-900 bg-amber-100/50 hover:bg-amber-100 transition-colors text-xs sm:text-sm"
+            className="w-full px-4 sm:px-6 py-3.5 flex items-center justify-between text-left font-bold text-amber-900 bg-amber-100/50 hover:bg-amber-100 transition-colors text-xs sm:text-sm rounded-xl"
           >
             <span className="flex items-center gap-2">
               <i className="fa-solid fa-users text-amber-800"></i> 
@@ -394,15 +401,17 @@ export default function StoreDetailPage() {
           </button>
 
           {isMemberListOpen && (
-            <div className="p-4 sm:p-6 divide-y divide-amber-100">
+            <div className="p-4 sm:p-6 divide-y divide-amber-100 overflow-visible">
               {anggotas.length === 0 ? (
                 <p className="text-xs sm:text-sm text-gray-500 italic py-2">Belum ada anggota lain di toko ini.</p>
               ) : (
                 anggotas.map((item) => (
                   <div key={item.id} className="py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative">
                     <div className="overflow-hidden">
-                      <p className="text-[11px] sm:text-xs font-mono text-gray-600 truncate">ID User: {item.user_id}</p>
-                      <span className={`inline-block mt-1 px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold uppercase tracking-wider ${
+                      {/* [PERBAIKAN]: Menampilkan Nama dan Email alih-alih ID User */}
+                      <h4 className="font-bold text-gray-900 text-xs sm:text-sm">{item.nama_user}</h4>
+                      <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5">{item.email_user}</p>
+                      <span className={`inline-block mt-1.5 px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold uppercase tracking-wider ${
                         item.status === 'pemilik' 
                           ? 'bg-amber-800 text-white' 
                           : item.status === 'tergabung' 
@@ -413,8 +422,7 @@ export default function StoreDetailPage() {
                       </span>
                     </div>
 
-                    {/* [BARU]: Tombol aksi titik tiga untuk kelola member (Terima, Jadikan Pemilik, Kick) */}
-                    <div className="relative inline-block text-left self-end sm:self-center">
+                    <div className="relative inline-block text-left self-end sm:self-center z-30">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -427,7 +435,7 @@ export default function StoreDetailPage() {
                       </button>
 
                       {activeMemberDropdown === item.id && (
-                        <div className="absolute right-0 mt-2 w-44 bg-white rounded-md shadow-lg border border-gray-200 z-20 py-1">
+                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-xl border border-gray-200 z-50 py-1">
                           {item.status === 'pending' && (
                             <button
                               onClick={() => handleUpdateAnggotaStatus(item.id, 'tergabung')}
