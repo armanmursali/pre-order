@@ -1,10 +1,8 @@
-// app/(dashboard)/store/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
-// Mengimpor helper terpisah untuk mengirim pesan permintaan masuk toko
 import { kirimpesanpermintaanmasuktoko } from '@/utils/kirimpesanpermintaanmasuktoko';
 
 interface Kategori {
@@ -268,7 +266,7 @@ export default function StorePage() {
 
       if (updateError) throw updateError;
 
-      // Memanggil helper kirimpesanpermintaanmasuktoko
+     
       await kirimpesanpermintaanmasuktoko(
         targetToko.user_id,
         targetToko.id,
@@ -384,7 +382,7 @@ export default function StorePage() {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-0.5 sm:p-6 relative">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-2 sm:p-6 relative">
       
       {activeDropdown && (
         <div 
@@ -428,7 +426,7 @@ export default function StorePage() {
           <p>Belum ada data toko. Silakan tambahkan toko baru atau gabung ke toko lain.</p>
         </div>
       ) : (
-        /* [PERUBAHAN PRESISI]: Mengubah grid menjadi 2 kolom di mobile (grid-cols-2) agar card bersampingan */
+       
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 px-1 sm:px-0">
           {tokos.map((toko) => {
             const isPending = toko.status_keanggotaan === 'pending';
