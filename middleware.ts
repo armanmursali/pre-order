@@ -43,21 +43,26 @@ export async function middleware(request: NextRequest) {
 
   const isPublicRoute = path === '/login' || path === '/' || hasAuthCode;
 
-  
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('next', path);
-    return NextResponse.redirect(url);
+    
+
+    supabaseResponse = NextResponse.redirect(url);
+    supabaseResponse.cookies.set('redirectTo', path, { path: '/', httpOnly: true });
+    return supabaseResponse;
   }
 
- 
   if (user && path === '/login' && !hasAuthCode) {
-    const nextUrl = request.nextUrl.searchParams.get('next') || '/beranda';
+    const nextUrl = request.nextUrl.searchParams.get('next') || request.cookies.get('redirectTo')?.value || '/beranda';
     const url = request.nextUrl.clone();
     url.pathname = nextUrl;
     url.searchParams.delete('next');
-    return NextResponse.redirect(url);
+    
+    supabaseResponse = NextResponse.redirect(url);
+    supabaseResponse.cookies.delete('redirectTo');
+    return supabaseResponse;
   }
 
   return supabaseResponse;

@@ -6,15 +6,15 @@ export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
   
-
-  const rawNext = requestUrl.searchParams.get('next');
+  const cookieStore = await cookies();
+  
+ 
+  const rawNext = requestUrl.searchParams.get('next') || cookieStore.get('redirectTo')?.value;
   const next = rawNext ? decodeURIComponent(rawNext) : '/beranda';
   
   const origin = requestUrl.origin;
 
   if (code) {
-    const cookieStore = await cookies();
-    
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
                 cookieStore.set(name, value, options)
               );
             } catch {
-             
+       
             }
           },
         },
@@ -40,7 +40,9 @@ export async function GET(request: Request) {
     
     if (!error) {
     
-      return NextResponse.redirect(`${origin}${next}`);
+      const response = NextResponse.redirect(`${origin}${next}`);
+      response.cookies.delete('redirectTo');
+      return response;
     }
   }
 
