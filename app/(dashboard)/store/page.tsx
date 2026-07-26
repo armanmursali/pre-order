@@ -20,6 +20,7 @@ interface Toko {
   kategori_toko?: {
     nama: string;
   };
+  status_keanggotaan?: string; // [BARU]: Menyimpan status user pada toko tersebut (pemilik/tergabung/pending)
 }
 
 export default function StorePage() {
@@ -64,6 +65,7 @@ export default function StorePage() {
     }, 3000);
   };
   
+  // [PERBAIKAN LOGIKA]: Mengambil daftar toko milik sendiri dan toko yang sudah berstatus 'tergabung'
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -81,29 +83,54 @@ export default function StorePage() {
         setKategoris(dataKategori);
       }
 
+      // Ambil relasi dari tabel user_toko untuk user yang sedang login
       const { data: joinedStores } = await supabase
         .from('user_toko')
-        .select('toko_id')
+        .select('toko_id, status')
         .eq('user_id', session.user.id);
 
-      const joinedStoreIds = joinedStores ? joinedStores.map((item) => item.toko_id) : [];
+      const approvedStoreIds = joinedStores 
+        ? joinedStores.filter(item => item.status === 'tergabung').map(item => item.toko_id) 
+        : [];
+
+      const pendingStoreIds = joinedStores 
+        ? joinedStores.filter(item => item.status === 'pending').map(item => item.toko_id) 
+        : [];
 
       let query = supabase
         .from('toko')
         .select('*, kategori_toko(nama)');
 
-      if (joinedStoreIds.length > 0) {
-        query = query.or(`user_id.eq.${session.user.id},id.in.(${joinedStoreIds.join(',')})`);
-      } else {
-        query = query.eq('user_id', session.user.id);
-      }
+      // Kumpulkan semua ID toko yang relevan untuk user ini (milik sendiri, approved, atau pending)
+      const allAccessibleIds = [
+        ...approvedStoreIds,
+        ...pendingStoreIds
+      ];
 
-      const { data: dataToko, error: errorToko } = await query.order('created_at', { ascending: false });
+      // Ambil toko milik sendiri ditambah toko yang berelasi di user_toko
+      let { data: dataToko, error: errorToko } = await supabase
+        .from('toko')
+        .select('*, kategori_toko(nama)')
+        .order('created_at', { ascending: false });
 
       if (errorToko) {
         console.error('Gagal memuat toko:', errorToko.message);
       } else if (dataToko) {
-        setTokos(dataToko);
+        // Tandai status keanggotaan setiap toko untuk user aktif
+        const mappedTokos = dataToko
+          .filter(toko => toko.user_id === session.user.id || allAccessibleIds.includes(toko.id))
+          .map(toko => {
+            let status = 'tergabung';
+            if (toko.user_id === session.user.id) {
+              status = 'pemilik';
+            } else {
+              const foundJoin = joinedStores?.find(j => j.toko_id === toko.id);
+              status = foundJoin ? foundJoin.status : 'pending';
+            }
+            return { ...toko, status_keanggotaan: status };
+          });
+
+        setTokos(mappedTokos);
       }
     } catch (error: any) {
       console.error('Terjadi kesalahan sistem:', error.message);
@@ -166,9 +193,11 @@ export default function StorePage() {
     setDeleteInputName('');
   };
 
+  // [PERBAIKAN LOGIKA GABUNG TOKO]: Memastikan pencarian ID bersih dan memasukkan status 'pending'
   const handleJoinStore = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!joinStoreId.trim()) {
+    const cleanStoreId = joinStoreId.trim();
+    if (!cleanStoreId) {
       showToast('ID Toko wajib diisi!', 'error');
       return;
     }
@@ -178,35 +207,38 @@ export default function StorePage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) throw new Error('Anda harus login terlebih dahulu.');
 
+      // Validasi apakah toko dengan UUID tersebut benar-benar ada
       const { data: targetToko, error: findError } = await supabase
         .from('toko')
         .select('id, nama, user_id')
-        .eq('id', joinStoreId.trim())
-        .single();
+        .eq('id', cleanStoreId)
+        .maybeSingle();
 
       if (findError || !targetToko) {
-        throw new Error('Toko dengan ID tersebut tidak ditemukan.');
+        throw new Error('Toko dengan ID tersebut tidak ditemukan di database.');
       }
 
       if (targetToko.user_id === session.user.id) {
         throw new Error('Anda adalah pemilik utama toko ini.');
       }
 
+      // Masukkan ke user_toko dengan status awal 'pending'
       const { error: insertError } = await supabase
         .from('user_toko')
         .insert({
           user_id: session.user.id,
           toko_id: targetToko.id,
+          status: 'pending'
         });
 
       if (insertError) {
         if (insertError.code === '23505') {
-          throw new Error('Anda sudah tergabung di toko ini sebelumnya.');
+          throw new Error('Anda sudah mengajukan permintaan atau tergabung di toko ini.');
         }
         throw insertError;
       }
 
-      showToast(`Berhasil bergabung ke toko "${targetToko.nama}"!`, 'success');
+      showToast(`Permintaan gabung ke toko "${targetToko.nama}" dikirim (Status: Pending)!`, 'success');
       setIsJoinModalOpen(false);
       setJoinStoreId('');
       fetchData();
@@ -312,7 +344,6 @@ export default function StorePage() {
   };
 
   return (
-    /* [PENYESUAIAN RESPONSIF]: Mengubah padding container menjadi px-0.5 di mobile, dan sm:p-6 di desktop */
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-0.5 sm:p-6 relative">
       
       {activeDropdown && (
@@ -322,7 +353,6 @@ export default function StorePage() {
         />
       )}
 
-      {/* [PENYESUAIAN RESPONSIF]: Ukuran teks judul dan tombol disesuaikan untuk layar kecil */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6 px-2 sm:px-0">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-amber-900">Manajemen Toko (Store)</h1>
@@ -359,78 +389,128 @@ export default function StorePage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 px-2 sm:px-0">
-          {tokos.map((toko) => (
-            <div key={toko.id} className="relative bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-orange-200 transition-all group flex flex-col overflow-hidden">
-              
-              <div className="absolute top-3 right-3 z-10">
-                <div className="relative inline-block text-left">
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setActiveDropdown(activeDropdown === toko.id ? null : toko.id);
-                    }}
-                    className="w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm text-gray-600 hover:bg-orange-100 hover:text-orange-700 flex items-center justify-center transition-colors shadow-sm border border-gray-100"
-                    title="Aksi"
-                  >
-                    <i className="fa-solid fa-ellipsis-vertical"></i>
-                  </button>
-
-                  {activeDropdown === toko.id && (
-                    <div className="absolute right-0 mt-2 w-32 bg-white rounded-md shadow-lg border border-gray-200 z-20 py-1">
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          openEditModal(toko);
-                        }}
-                        className="w-full text-left px-4 py-2 text-xs sm:text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 flex items-center gap-2 transition-colors"
-                      >
-                        <i className="fa-solid fa-pen-to-square w-4"></i> Edit
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          openDeleteModal(toko);
-                        }}
-                        className="w-full text-left px-4 py-2 text-xs sm:text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
-                      >
-                        <i className="fa-solid fa-trash w-4"></i> Hapus
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <Link href={`/store/${toko.id}`} className="flex flex-col flex-grow outline-none focus:ring-2 focus:ring-orange-500 rounded-xl">
-                <div className="h-44 sm:h-48 w-full bg-gray-100 flex-shrink-0 relative">
-                  {toko.foto ? (
-                    <img src={toko.foto} alt={toko.nama} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-300">
-                      <i className="fa-solid fa-image text-4xl sm:text-5xl"></i>
-                    </div>
-                  )}
-                </div>
+          {tokos.map((toko) => {
+            const isPending = toko.status_keanggotaan === 'pending';
+            
+            return (
+              <div key={toko.id} className="relative bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-orange-200 transition-all group flex flex-col overflow-hidden">
                 
-                <div className="p-4 sm:p-5 flex flex-col flex-grow">
-                  <div className="flex flex-col gap-1 mb-2 sm:mb-3">
-                    <span className="w-fit bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded text-[9px] sm:text-[10px] font-bold uppercase tracking-wider">
-                      {toko.kategori_toko?.nama || 'Tanpa Kategori'}
-                    </span>
-                    <h3 className="text-base sm:text-lg font-bold text-amber-900 group-hover:text-orange-700 transition-colors line-clamp-1">
-                      {toko.nama}
-                    </h3>
-                  </div>
-                  
-                  <p className="text-xs sm:text-sm text-gray-500 line-clamp-3 leading-relaxed">
-                    {toko.deskripsi ? toko.deskripsi : <span className="italic">Tidak ada deskripsi.</span>}
-                  </p>
+                {/* Badge Status Toko */}
+                <div className="absolute top-3 left-3 z-10">
+                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm ${
+                    toko.status_keanggotaan === 'pemilik' 
+                      ? 'bg-purple-600 text-white' 
+                      : toko.status_keanggotaan === 'tergabung' 
+                      ? 'bg-green-600 text-white' 
+                      : 'bg-yellow-500 text-white'
+                  }`}>
+                    {toko.status_keanggotaan}
+                  </span>
                 </div>
-              </Link>
-            </div>
-          ))}
+
+                {toko.status_keanggotaan === 'pemilik' && (
+                  <div className="absolute top-3 right-3 z-10">
+                    <div className="relative inline-block text-left">
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setActiveDropdown(activeDropdown === toko.id ? null : toko.id);
+                        }}
+                        className="w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm text-gray-600 hover:bg-orange-100 hover:text-orange-700 flex items-center justify-center transition-colors shadow-sm border border-gray-100"
+                        title="Aksi"
+                      >
+                        <i className="fa-solid fa-ellipsis-vertical"></i>
+                      </button>
+
+                      {activeDropdown === toko.id && (
+                        <div className="absolute right-0 mt-2 w-32 bg-white rounded-md shadow-lg border border-gray-200 z-20 py-1">
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              openEditModal(toko);
+                            }}
+                            className="w-full text-left px-4 py-2 text-xs sm:text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 flex items-center gap-2 transition-colors"
+                          >
+                            <i className="fa-solid fa-pen-to-square w-4"></i> Edit
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              openDeleteModal(toko);
+                            }}
+                            className="w-full text-left px-4 py-2 text-xs sm:text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                          >
+                            <i className="fa-solid fa-trash w-4"></i> Hapus
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* [PENGAMANAN]: Jika status masih pending, klik card tidak bisa masuk ke detail toko */}
+                {isPending ? (
+                  <div className="flex flex-col flex-grow cursor-not-allowed opacity-75">
+                    <div className="h-44 sm:h-48 w-full bg-gray-100 flex-shrink-0 relative">
+                      {toko.foto ? (
+                        <img src={toko.foto} alt={toko.nama} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-300">
+                          <i className="fa-solid fa-image text-4xl sm:text-5xl"></i>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-4 sm:p-5 flex flex-col flex-grow">
+                      <div className="flex flex-col gap-1 mb-2 sm:mb-3">
+                        <span className="w-fit bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded text-[9px] sm:text-[10px] font-bold uppercase tracking-wider">
+                          {toko.kategori_toko?.nama || 'Tanpa Kategori'}
+                        </span>
+                        <h3 className="text-base sm:text-lg font-bold text-amber-900 line-clamp-1">
+                          {toko.nama}
+                        </h3>
+                      </div>
+                      <p className="text-xs sm:text-sm text-yellow-600 font-medium italic mb-2">
+                        Menunggu persetujuan pemilik toko...
+                      </p>
+                      <p className="text-xs sm:text-sm text-gray-500 line-clamp-2 leading-relaxed">
+                        {toko.deskripsi ? toko.deskripsi : <span className="italic">Tidak ada deskripsi.</span>}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <Link href={`/store/${toko.id}`} className="flex flex-col flex-grow outline-none focus:ring-2 focus:ring-orange-500 rounded-xl">
+                    <div className="h-44 sm:h-48 w-full bg-gray-100 flex-shrink-0 relative">
+                      {toko.foto ? (
+                        <img src={toko.foto} alt={toko.nama} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-300">
+                          <i className="fa-solid fa-image text-4xl sm:text-5xl"></i>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="p-4 sm:p-5 flex flex-col flex-grow">
+                      <div className="flex flex-col gap-1 mb-2 sm:mb-3">
+                        <span className="w-fit bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded text-[9px] sm:text-[10px] font-bold uppercase tracking-wider">
+                          {toko.kategori_toko?.nama || 'Tanpa Kategori'}
+                        </span>
+                        <h3 className="text-base sm:text-lg font-bold text-amber-900 group-hover:text-orange-700 transition-colors line-clamp-1">
+                          {toko.nama}
+                        </h3>
+                      </div>
+                      
+                      <p className="text-xs sm:text-sm text-gray-500 line-clamp-3 leading-relaxed">
+                        {toko.deskripsi ? toko.deskripsi : <span className="italic">Tidak ada deskripsi.</span>}
+                      </p>
+                    </div>
+                  </Link>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 

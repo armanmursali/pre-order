@@ -1,3 +1,4 @@
+// app/(dashboard)/store/[id]/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -5,9 +6,9 @@ import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
 
-
 interface TokoDetail {
   id: string;
+  user_id: string;
   nama: string;
   deskripsi?: string | null;
   foto: string | null;
@@ -17,12 +18,17 @@ interface TokoDetail {
   };
 }
 
+interface AnggotaToko {
+  id: string;
+  user_id: string;
+  status: string;
+  user_email?: string;
+}
 
 interface JenisProduk {
   id: string;
   nama: string;
 }
-
 
 interface Produk {
   id: string;
@@ -43,7 +49,9 @@ export default function StoreDetailPage() {
 
   const [toko, setToko] = useState<TokoDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [isOwner, setIsOwner] = useState<boolean>(false);
 
+  const [anggotas, setAnggotas] = useState<AnggotaToko[]>([]);
   const [produks, setProduks] = useState<Produk[]>([]);
   const [jenisProduks, setJenisProduks] = useState<JenisProduk[]>([]);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -56,9 +64,7 @@ export default function StoreDetailPage() {
   const [productToDelete, setProductToDelete] = useState<Produk | null>(null);
   const [deleteInputName, setDeleteInputName] = useState<string>('');
 
-  // [PERBAIKAN]: State untuk kontrol Modal Preview Gambar Produk
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
-
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const [productFormData, setProductFormData] = useState({
@@ -91,37 +97,103 @@ export default function StoreDetailPage() {
   const fetchAllData = async (tokoId: string) => {
     try {
       setLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        router.push('/login');
+        return;
+      }
       
+      // 1. Ambil detail toko
       const { data: dataToko, error: errorToko } = await supabase
         .from('toko')
         .select('*, kategori_toko(nama)')
         .eq('id', tokoId)
         .single();
 
-      if (errorToko) console.error('Gagal memuat detail toko:', errorToko.message);
-      else if (dataToko) setToko(dataToko);
+      if (errorToko || !dataToko) {
+        showToast('Toko tidak ditemukan.', 'error');
+        router.push('/store');
+        return;
+      }
 
-      const { data: dataJenis, error: errorJenis } = await supabase
+      // 2. Periksa hak akses: Apakah user adalah pemilik atau anggota berstatus 'tergabung'
+      const isUserOwner = dataToko.user_id === session.user.id;
+      setIsOwner(isUserOwner);
+
+      if (!isUserOwner) {
+        const { data: membership } = await supabase
+          .from('user_toko')
+          .select('status')
+          .eq('toko_id', tokoId)
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+
+        if (!membership || membership.status !== 'tergabung') {
+          showToast('Anda belum disetujui atau tidak memiliki akses ke toko ini.', 'error');
+          router.push('/store');
+          return;
+        }
+      }
+
+      setToko(dataToko);
+
+      // 3. Jika pemilik, ambil daftar anggota (yang pending maupun tergabung)
+      if (isUserOwner) {
+        const { data: dataAnggota } = await supabase
+          .from('user_toko')
+          .select('*')
+          .eq('toko_id', tokoId);
+        
+        if (dataAnggota) setAnggotas(dataAnggota);
+      }
+
+      // 4. Ambil jenis produk dan produk
+      const { data: dataJenis } = await supabase
         .from('jenis_produk')
         .select('*')
         .order('nama', { ascending: true });
 
-      if (errorJenis) console.error('Gagal memuat jenis produk:', errorJenis.message);
-      else if (dataJenis) setJenisProduks(dataJenis);
+      if (dataJenis) setJenisProduks(dataJenis);
 
-      const { data: dataProduk, error: errorProduk } = await supabase
+      const { data: dataProduk } = await supabase
         .from('produk')
         .select('*, jenis_produk(nama)')
         .eq('toko_id', tokoId)
         .order('created_at', { ascending: false });
 
-      if (errorProduk) console.error('Gagal memuat produk:', errorProduk.message);
-      else if (dataProduk) setProduks(dataProduk);
+      if (dataProduk) setProduks(dataProduk);
 
     } catch (error: any) {
       console.error('Terjadi kesalahan sistem:', error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // [BARU]: Fungsi pemilik toko untuk mengubah status anggota menjadi 'tergabung' atau menghapusnya (kick)
+  const handleUpdateAnggotaStatus = async (anggotaId: string, newStatus: string) => {
+    try {
+      setIsSubmitting(true);
+      if (newStatus === 'kick') {
+        const { error } = await supabase
+          .from('user_toko')
+          .delete()
+          .eq('id', anggotaId);
+        if (error) throw error;
+        showToast('Anggota berhasil dikeluarkan dari toko.', 'success');
+      } else {
+        const { error } = await supabase
+          .from('user_toko')
+          .update({ status: newStatus })
+          .eq('id', anggotaId);
+        if (error) throw error;
+        showToast('Status anggota berhasil diperbarui menjadi Tergabung!', 'success');
+      }
+      if (toko?.id) fetchAllData(toko.id);
+    } catch (error: any) {
+      showToast('Gagal memperbarui status anggota: ' + error.message, 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -282,25 +354,11 @@ export default function StoreDetailPage() {
   }
 
   if (!toko) {
-    return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center min-h-[400px] flex flex-col items-center justify-center">
-        <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 mb-4">
-          <i className="fa-solid fa-store-slash text-3xl"></i>
-        </div>
-        <h2 className="text-xl font-bold text-amber-900 mb-2">Toko Tidak Ditemukan</h2>
-        <p className="text-gray-500 mb-6">Data toko yang Anda cari mungkin telah dihapus atau tidak tersedia.</p>
-        <button
-          onClick={() => router.push('/store')}
-          className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-lg font-medium transition-colors shadow-sm"
-        >
-          Kembali ke Daftar Toko
-        </button>
-      </div>
-    );
+    return null;
   }
 
   return (
-    <div className="space-y-6 relative">
+    <div className="space-y-6 relative p-0.5 sm:p-6">
       
       {activeDropdown && (
         <div 
@@ -309,7 +367,48 @@ export default function StoreDetailPage() {
         />
       )}
 
-    
+      {/* [BARU]: Panel Manajemen Anggota Toko (Hanya tampil jika user adalah pemilik toko) */}
+      {isOwner && anggotas.length > 0 && (
+        <div className="bg-amber-50/50 rounded-xl shadow-sm border border-amber-200 p-4 sm:p-6">
+          <h3 className="text-lg font-bold text-amber-900 mb-3 flex items-center gap-2">
+            <i className="fa-solid fa-users"></i> Manajemen Anggota Toko
+          </h3>
+          <div className="divide-y divide-amber-100">
+            {anggotas.map((item) => (
+              <div key={item.id} className="py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-mono text-gray-600">ID User: {item.user_id}</p>
+                  <span className={`inline-block mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                    item.status === 'tergabung' ? 'bg-green-600 text-white' : 'bg-yellow-500 text-white'
+                  }`}>
+                    Status: {item.status}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {item.status === 'pending' && (
+                    <button
+                      onClick={() => handleUpdateAnggotaStatus(item.id, 'tergabung')}
+                      disabled={isSubmitting}
+                      className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-sm"
+                    >
+                      Terima
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleUpdateAnggotaStatus(item.id, 'kick')}
+                    disabled={isSubmitting}
+                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-sm"
+                  >
+                    Keluarkan / Tolak
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Bagian Detail Toko */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-orange-50/30">
           <div className="flex items-center gap-3">
@@ -361,7 +460,7 @@ export default function StoreDetailPage() {
                   <p className="text-base font-medium text-gray-900">{toko.kategori_toko?.nama || '-'}</p>
                 </div>
                 <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 overflow-hidden">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">ID Sistem</p>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">ID Sistem (UUID)</p>
                   <p className="text-sm font-mono text-gray-600 truncate">{toko.id}</p>
                 </div>
               </div>
@@ -370,7 +469,7 @@ export default function StoreDetailPage() {
         </div>
       </div>
 
-     
+      {/* Bagian Produk Toko */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
           <div>
@@ -393,7 +492,6 @@ export default function StoreDetailPage() {
           </div>
         ) : (
           <>
-          
             <div className="hidden md:grid grid-cols-2 lg:grid-cols-3 gap-6">
               {produks.map((produk) => (
                 <div key={produk.id} className="relative bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all group flex flex-col overflow-hidden">
@@ -426,7 +524,6 @@ export default function StoreDetailPage() {
                     </div>
                   </div>
 
-               
                   <div className="h-48 w-full bg-gray-100 flex-shrink-0 relative cursor-pointer" onClick={() => produk.foto && setPreviewImageUrl(produk.foto)}>
                     {produk.foto ? (
                       <img src={produk.foto} alt={produk.nama} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
@@ -452,12 +549,10 @@ export default function StoreDetailPage() {
               ))}
             </div>
 
-        
             <div className="md:hidden divide-y divide-gray-100">
               {produks.map((produk) => (
                 <div key={produk.id} className="py-4 flex items-center justify-between gap-3 relative">
                   <div className="flex items-center gap-3 overflow-hidden">
-                  
                     <div className="w-14 h-14 bg-gray-100 rounded-xl flex-shrink-0 overflow-hidden cursor-pointer border border-gray-200" onClick={() => produk.foto && setPreviewImageUrl(produk.foto)}>
                       {produk.foto ? (
                         <img src={produk.foto} alt={produk.nama} className="w-full h-full object-cover" />
@@ -477,7 +572,6 @@ export default function StoreDetailPage() {
                     </div>
                   </div>
 
-               
                   <div className="flex-shrink-0 relative">
                     <button
                       onClick={() => setActiveDropdown(activeDropdown === produk.id ? null : produk.id)}
@@ -510,7 +604,7 @@ export default function StoreDetailPage() {
         )}
       </div>
 
-    
+      {/* Modal Tambah/Edit Produk */}
       {isProductModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
@@ -616,7 +710,7 @@ export default function StoreDetailPage() {
         </div>
       )}
 
-
+      {/* Modal Hapus Produk */}
       {isDeleteModalOpen && productToDelete && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
@@ -667,7 +761,7 @@ export default function StoreDetailPage() {
         </div>
       )}
 
-   
+      {/* Modal Preview Gambar */}
       {previewImageUrl && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md" onClick={() => setPreviewImageUrl(null)}>
           <div className="relative max-w-4xl w-full max-h-[90vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
@@ -687,7 +781,6 @@ export default function StoreDetailPage() {
         </div>
       )}
 
-   
       {toast && (
         <div className="fixed bottom-6 right-6 z-[200] transition-all duration-300 ease-in-out">
           <div className={`flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-xl text-white font-medium ${
