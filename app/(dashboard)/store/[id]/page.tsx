@@ -21,8 +21,7 @@ interface TokoDetail {
 interface AnggotaToko {
   id: string;
   user_id: string;
-  status: string;
-  user_email?: string;
+  status: string; // 'pending', 'tergabung', 'pemilik'
 }
 
 interface JenisProduk {
@@ -52,6 +51,9 @@ export default function StoreDetailPage() {
   const [isOwner, setIsOwner] = useState<boolean>(false);
 
   const [anggotas, setAnggotas] = useState<AnggotaToko[]>([]);
+  const [isMemberListOpen, setIsMemberListOpen] = useState<boolean>(false); // [BARU]: Default tertutup untuk list anggota di mobile/desktop
+  const [activeMemberDropdown, setActiveMemberDropdown] = useState<string | null>(null); // [BARU]: Dropdown titik tiga untuk aksi member
+
   const [produks, setProduks] = useState<Produk[]>([]);
   const [jenisProduks, setJenisProduks] = useState<JenisProduk[]>([]);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -116,38 +118,38 @@ export default function StoreDetailPage() {
         return;
       }
 
-      // 2. Periksa hak akses: Apakah user adalah pemilik atau anggota berstatus 'tergabung'
-      const isUserOwner = dataToko.user_id === session.user.id;
+      // 2. Periksa apakah user adalah pemilik utama (di tabel toko) atau pemilik/anggota di tabel user_toko
+      const { data: membership } = await supabase
+        .from('user_toko')
+        .select('status')
+        .eq('toko_id', tokoId)
+        .eq('user_id', session.user.id)
+        .maybeSingle();
+
+      const primaryOwner = dataToko.user_id === session.user.id;
+      const isMemberOwner = membership?.status === 'pemilik';
+      const isUserOwner = primaryOwner || isMemberOwner;
       setIsOwner(isUserOwner);
 
-      if (!isUserOwner) {
-        const { data: membership } = await supabase
-          .from('user_toko')
-          .select('status')
-          .eq('toko_id', tokoId)
-          .eq('user_id', session.user.id)
-          .maybeSingle();
+      const isApproved = membership?.status === 'tergabung';
 
-        if (!membership || membership.status !== 'tergabung') {
-          showToast('Anda belum disetujui atau tidak memiliki akses ke toko ini.', 'error');
-          router.push('/store');
-          return;
-        }
+      if (!isUserOwner && !isApproved) {
+        showToast('Anda belum disetujui atau tidak memiliki akses ke toko ini.', 'error');
+        router.push('/store');
+        return;
       }
 
       setToko(dataToko);
 
-      // 3. Jika pemilik, ambil daftar anggota (yang pending maupun tergabung)
-      if (isUserOwner) {
-        const { data: dataAnggota } = await supabase
-          .from('user_toko')
-          .select('*')
-          .eq('toko_id', tokoId);
-        
-        if (dataAnggota) setAnggotas(dataAnggota);
-      }
+      // 3. Ambil seluruh daftar anggota toko (termasuk pemilik tambahan dan pending)
+      const { data: dataAnggota } = await supabase
+        .from('user_toko')
+        .select('*')
+        .eq('toko_id', tokoId);
+      
+      if (dataAnggota) setAnggotas(dataAnggota);
 
-      // 4. Ambil jenis produk dan produk
+      // 4. Ambil jenis produk dan produk toko
       const { data: dataJenis } = await supabase
         .from('jenis_produk')
         .select('*')
@@ -170,10 +172,12 @@ export default function StoreDetailPage() {
     }
   };
 
-  // [BARU]: Fungsi pemilik toko untuk mengubah status anggota menjadi 'tergabung' atau menghapusnya (kick)
+  // [BARU]: Fungsi manajemen status anggota (Terima, Ubah Jadi Pemilik, Keluarkan)
   const handleUpdateAnggotaStatus = async (anggotaId: string, newStatus: string) => {
     try {
       setIsSubmitting(true);
+      setActiveMemberDropdown(null);
+
       if (newStatus === 'kick') {
         const { error } = await supabase
           .from('user_toko')
@@ -187,7 +191,12 @@ export default function StoreDetailPage() {
           .update({ status: newStatus })
           .eq('id', anggotaId);
         if (error) throw error;
-        showToast('Status anggota berhasil diperbarui menjadi Tergabung!', 'success');
+        showToast(
+          newStatus === 'pemilik' 
+            ? 'Anggota berhasil diubah menjadi Pemilik toko!' 
+            : 'Status anggota berhasil diperbarui menjadi Tergabung!', 
+          'success'
+        );
       }
       if (toko?.id) fetchAllData(toko.id);
     } catch (error: any) {
@@ -360,57 +369,101 @@ export default function StoreDetailPage() {
   return (
     <div className="space-y-6 relative p-0.5 sm:p-6">
       
-      {activeDropdown && (
+      {(activeDropdown || activeMemberDropdown) && (
         <div 
           className="fixed inset-0 z-[5]" 
-          onClick={() => setActiveDropdown(null)}
+          onClick={() => {
+            setActiveDropdown(null);
+            setActiveMemberDropdown(null);
+          }}
         />
       )}
 
-      {/* [BARU]: Panel Manajemen Anggota Toko (Hanya tampil jika user adalah pemilik toko) */}
-      {isOwner && anggotas.length > 0 && (
-        <div className="bg-amber-50/50 rounded-xl shadow-sm border border-amber-200 p-4 sm:p-6">
-          <h3 className="text-lg font-bold text-amber-900 mb-3 flex items-center gap-2">
-            <i className="fa-solid fa-users"></i> Manajemen Anggota Toko
-          </h3>
-          <div className="divide-y divide-amber-100">
-            {anggotas.map((item) => (
-              <div key={item.id} className="py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-mono text-gray-600">ID User: {item.user_id}</p>
-                  <span className={`inline-block mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                    item.status === 'tergabung' ? 'bg-green-600 text-white' : 'bg-yellow-500 text-white'
-                  }`}>
-                    Status: {item.status}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {item.status === 'pending' && (
-                    <button
-                      onClick={() => handleUpdateAnggotaStatus(item.id, 'tergabung')}
-                      disabled={isSubmitting}
-                      className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-sm"
-                    >
-                      Terima
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleUpdateAnggotaStatus(item.id, 'kick')}
-                    disabled={isSubmitting}
-                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-sm"
-                  >
-                    Keluarkan / Tolak
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+      {/* [BARU]: Panel Anggota Toko di dalam komponen detail toko, default tertutup dan responsif mobile */}
+      {isOwner && (
+        <div className="bg-amber-50/60 rounded-xl shadow-sm border border-amber-200 overflow-hidden">
+          <button
+            onClick={() => setIsMemberListOpen(!isMemberListOpen)}
+            className="w-full px-4 sm:px-6 py-3.5 flex items-center justify-between text-left font-bold text-amber-900 bg-amber-100/50 hover:bg-amber-100 transition-colors text-xs sm:text-sm"
+          >
+            <span className="flex items-center gap-2">
+              <i className="fa-solid fa-users text-amber-800"></i> 
+              Daftar Anggota & Pengajuan Toko ({anggotas.length})
+            </span>
+            <i className={`fa-solid fa-chevron-down transition-transform ${isMemberListOpen ? 'rotate-180' : ''}`}></i>
+          </button>
+
+          {isMemberListOpen && (
+            <div className="p-4 sm:p-6 divide-y divide-amber-100">
+              {anggotas.length === 0 ? (
+                <p className="text-xs sm:text-sm text-gray-500 italic py-2">Belum ada anggota lain di toko ini.</p>
+              ) : (
+                anggotas.map((item) => (
+                  <div key={item.id} className="py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative">
+                    <div className="overflow-hidden">
+                      <p className="text-[11px] sm:text-xs font-mono text-gray-600 truncate">ID User: {item.user_id}</p>
+                      <span className={`inline-block mt-1 px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold uppercase tracking-wider ${
+                        item.status === 'pemilik' 
+                          ? 'bg-amber-800 text-white' 
+                          : item.status === 'tergabung' 
+                          ? 'bg-orange-600 text-white' 
+                          : 'bg-yellow-500 text-white'
+                      }`}>
+                        {item.status === 'pemilik' ? 'toko/store saya' : item.status}
+                      </span>
+                    </div>
+
+                    {/* [BARU]: Tombol aksi titik tiga untuk kelola member (Terima, Jadikan Pemilik, Kick) */}
+                    <div className="relative inline-block text-left self-end sm:self-center">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveMemberDropdown(activeMemberDropdown === item.id ? null : item.id);
+                        }}
+                        className="w-8 h-8 rounded-full bg-white text-gray-600 hover:bg-orange-100 hover:text-orange-700 flex items-center justify-center transition-colors shadow-sm border border-gray-200"
+                        title="Aksi Anggota"
+                      >
+                        <i className="fa-solid fa-ellipsis-vertical"></i>
+                      </button>
+
+                      {activeMemberDropdown === item.id && (
+                        <div className="absolute right-0 mt-2 w-44 bg-white rounded-md shadow-lg border border-gray-200 z-20 py-1">
+                          {item.status === 'pending' && (
+                            <button
+                              onClick={() => handleUpdateAnggotaStatus(item.id, 'tergabung')}
+                              className="w-full text-left px-4 py-2 text-xs sm:text-sm text-green-700 hover:bg-green-50 flex items-center gap-2 transition-colors font-medium"
+                            >
+                              <i className="fa-solid fa-check w-4"></i> Terima
+                            </button>
+                          )}
+                          {item.status !== 'pemilik' && (
+                            <button
+                              onClick={() => handleUpdateAnggotaStatus(item.id, 'pemilik')}
+                              className="w-full text-left px-4 py-2 text-xs sm:text-sm text-amber-800 hover:bg-amber-50 flex items-center gap-2 transition-colors font-medium"
+                            >
+                              <i className="fa-solid fa-user-shield w-4"></i> Ubah Jadi Pemilik
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleUpdateAnggotaStatus(item.id, 'kick')}
+                            className="w-full text-left px-4 py-2 text-xs sm:text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors font-medium"
+                          >
+                            <i className="fa-solid fa-user-slash w-4"></i> Keluarkan
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
       )}
 
       {/* Bagian Detail Toko */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-orange-50/30">
+        <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-200 flex items-center justify-between bg-orange-50/30">
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push('/store')}
@@ -419,49 +472,49 @@ export default function StoreDetailPage() {
             >
               <i className="fa-solid fa-arrow-left"></i>
             </button>
-            <h1 className="text-xl font-bold text-amber-900">Detail Toko</h1>
+            <h1 className="text-lg sm:text-xl font-bold text-amber-900">Detail Toko</h1>
           </div>
-          <span className="bg-orange-100 text-orange-800 px-4 py-1.5 rounded-full text-xs font-bold tracking-wide">
+          <span className="bg-orange-100 text-orange-800 px-3 sm:px-4 py-1.5 rounded-full text-[10px] sm:text-xs font-bold tracking-wide">
             {toko.kategori_toko?.nama || 'Tanpa Kategori'}
           </span>
         </div>
 
-        <div className="p-6 md:p-8 flex flex-col md:flex-row gap-8">
+        <div className="p-4 sm:p-6 md:p-8 flex flex-col md:flex-row gap-6 sm:gap-8">
           <div className="w-full md:w-1/3 flex-shrink-0">
             <div className="aspect-square rounded-2xl overflow-hidden border-2 border-gray-100 shadow-sm bg-gray-50 flex items-center justify-center cursor-pointer" onClick={() => toko.foto && setPreviewImageUrl(toko.foto)}>
               {toko.foto ? (
                 <img src={toko.foto} alt={toko.nama} className="w-full h-full object-cover" />
               ) : (
                 <div className="text-center text-gray-400">
-                  <i className="fa-solid fa-store text-6xl mb-3"></i>
-                  <p className="text-sm font-medium">Tidak ada foto</p>
+                  <i className="fa-solid fa-store text-5xl sm:text-6xl mb-2 sm:mb-3"></i>
+                  <p className="text-xs sm:text-sm font-medium">Tidak ada foto</p>
                 </div>
               )}
             </div>
           </div>
 
           <div className="w-full md:w-2/3 flex flex-col">
-            <h2 className="text-3xl font-extrabold text-gray-900 mb-2">{toko.nama}</h2>
-            <p className="text-sm text-gray-500 mb-6 flex items-center gap-2">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-2">{toko.nama}</h2>
+            <p className="text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6 flex items-center gap-2">
               <i className="fa-regular fa-calendar-days"></i>
               Terdaftar pada {new Date(toko.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
             </p>
 
-            <div className="space-y-4">
-              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Deskripsi Toko</p>
-                <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+            <div className="space-y-3 sm:space-y-4">
+              <div className="p-3.5 sm:p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 sm:mb-2">Deskripsi Toko</p>
+                <p className="text-xs sm:text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
                   {toko.deskripsi ? toko.deskripsi : <span className="italic text-gray-400">Tidak ada deskripsi yang ditambahkan.</span>}
                 </p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Kategori Utama</p>
-                  <p className="text-base font-medium text-gray-900">{toko.kategori_toko?.nama || '-'}</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                <div className="p-3.5 sm:p-4 bg-gray-50 rounded-xl border border-gray-100">
+                  <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Kategori Utama</p>
+                  <p className="text-sm sm:text-base font-medium text-gray-900">{toko.kategori_toko?.nama || '-'}</p>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 overflow-hidden">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">ID Sistem (UUID)</p>
-                  <p className="text-sm font-mono text-gray-600 truncate">{toko.id}</p>
+                <div className="p-3.5 sm:p-4 bg-gray-50 rounded-xl border border-gray-100 overflow-hidden">
+                  <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">ID Sistem (UUID)</p>
+                  <p className="text-xs sm:text-sm font-mono text-gray-600 truncate">{toko.id}</p>
                 </div>
               </div>
             </div>
@@ -470,24 +523,24 @@ export default function StoreDetailPage() {
       </div>
 
       {/* Bagian Produk Toko */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+        <div className="flex justify-between items-center mb-4 sm:mb-6 border-b border-gray-100 pb-3.5 sm:pb-4">
           <div>
-            <h2 className="text-xl font-bold text-amber-900">Produk Toko</h2>
-            <p className="text-sm text-gray-500 mt-1">Kelola barang yang dijual di toko ini.</p>
+            <h2 className="text-lg sm:text-xl font-bold text-amber-900">Produk Toko</h2>
+            <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Kelola barang yang dijual di toko ini.</p>
           </div>
           <button
             onClick={() => setIsProductModalOpen(true)}
-            className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm"
+            className="flex items-center gap-1.5 sm:gap-2 bg-orange-600 hover:bg-orange-700 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors shadow-sm"
           >
             <i className="fa-solid fa-plus"></i>
-            <span className="hidden sm:inline">Tambah Produk</span>
+            <span>Tambah Produk</span>
           </button>
         </div>
 
         {produks.length === 0 ? (
-          <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-300">
-            <i className="fa-solid fa-box-open text-4xl mb-3 text-gray-400"></i>
+          <div className="text-center py-10 sm:py-12 text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-300 text-xs sm:text-sm">
+            <i className="fa-solid fa-box-open text-3xl sm:text-4xl mb-2 sm:mb-3 text-gray-400"></i>
             <p>Toko ini belum memiliki produk. Silakan tambahkan produk baru.</p>
           </div>
         ) : (
@@ -532,7 +585,7 @@ export default function StoreDetailPage() {
                         <i className="fa-solid fa-box text-5xl"></i>
                       </div>
                     )}
-                    <div className="absolute bottom-3 left-3 bg-amber-900/90 backdrop-blur-sm text-white px-3 py-1 rounded-lg font-bold shadow-sm">
+                    <div className="absolute bottom-3 left-3 bg-amber-900/90 backdrop-blur-sm text-white px-3 py-1 rounded-lg font-bold shadow-sm text-sm">
                       {formatRupiah(produk.harga)}
                     </div>
                   </div>
@@ -551,7 +604,7 @@ export default function StoreDetailPage() {
 
             <div className="md:hidden divide-y divide-gray-100">
               {produks.map((produk) => (
-                <div key={produk.id} className="py-4 flex items-center justify-between gap-3 relative">
+                <div key={produk.id} className="py-3 flex items-center justify-between gap-3 relative">
                   <div className="flex items-center gap-3 overflow-hidden">
                     <div className="w-14 h-14 bg-gray-100 rounded-xl flex-shrink-0 overflow-hidden cursor-pointer border border-gray-200" onClick={() => produk.foto && setPreviewImageUrl(produk.foto)}>
                       {produk.foto ? (
@@ -567,7 +620,7 @@ export default function StoreDetailPage() {
                       <span className="text-[10px] font-bold text-orange-700 bg-orange-50 px-2 py-0.5 rounded w-fit mb-1">
                         {produk.jenis_produk?.nama || 'Tanpa Jenis'}
                       </span>
-                      <h4 className="font-bold text-gray-900 text-sm truncate">{produk.nama}</h4>
+                      <h4 className="font-bold text-gray-900 text-xs sm:text-sm truncate">{produk.nama}</h4>
                       <span className="text-xs font-semibold text-amber-900 mt-0.5">{formatRupiah(produk.harga)}</span>
                     </div>
                   </div>
@@ -584,13 +637,13 @@ export default function StoreDetailPage() {
                       <div className="absolute right-0 mt-2 w-32 bg-white rounded-md shadow-lg border border-gray-200 z-20 py-1">
                         <button
                           onClick={() => openEditProductModal(produk)}
-                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 flex items-center gap-2 transition-colors"
+                          className="w-full text-left px-4 py-2 text-xs sm:text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 flex items-center gap-2 transition-colors"
                         >
                           <i className="fa-solid fa-pen-to-square w-4"></i> Edit
                         </button>
                         <button
                           onClick={() => openDeleteModal(produk)}
-                          className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                          className="w-full text-left px-4 py-2 text-xs sm:text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
                         >
                           <i className="fa-solid fa-trash w-4"></i> Hapus
                         </button>
@@ -606,39 +659,39 @@ export default function StoreDetailPage() {
 
       {/* Modal Tambah/Edit Produk */}
       {isProductModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-bold text-amber-900">
+            <div className="flex justify-between items-center px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-200">
+              <h2 className="text-base sm:text-lg font-bold text-amber-900">
                 {editProductId ? 'Edit Produk' : 'Tambah Produk Baru'}
               </h2>
               <button onClick={closeProductModal} className="text-gray-400 hover:text-red-500 transition-colors">
-                <i className="fa-solid fa-xmark text-xl"></i>
+                <i className="fa-solid fa-xmark text-lg sm:text-xl"></i>
               </button>
             </div>
             
             <div className="overflow-y-auto">
-              <form onSubmit={handleProductSubmit} className="p-6 space-y-4">
+              <form onSubmit={handleProductSubmit} className="p-4 sm:p-6 space-y-3 sm:space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Nama Produk</label>
+                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1">Nama Produk</label>
                   <input
                     type="text"
                     name="nama"
                     value={productFormData.nama}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-xs sm:text-sm transition-all"
                     placeholder="Contoh: Baju Kaos Hitam"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Jenis Produk</label>
+                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1">Jenis Produk</label>
                   <select
                     name="jenis_produk_id"
                     value={productFormData.jenis_produk_id}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all bg-white"
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-xs sm:text-sm transition-all bg-white"
                     required
                   >
                     <option value="" disabled>-- Pilih Jenis --</option>
@@ -651,50 +704,50 @@ export default function StoreDetailPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Harga Produk (Rp)</label>
+                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1">Harga Produk (Rp)</label>
                   <input
                     type="number"
                     name="harga"
                     min="0"
                     value={productFormData.harga}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-xs sm:text-sm transition-all"
                     placeholder="Contoh: 50000"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Foto Produk</label>
+                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1">Foto Produk</label>
                   <input
                     type="file"
                     accept="image/*"
                     onChange={handleFileChange}
-                    className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 transition-colors"
+                    className="w-full text-xs sm:text-sm text-gray-500 file:mr-3 sm:file:mr-4 file:py-1.5 sm:file:py-2 file:px-3 sm:file:px-4 file:rounded-lg file:border-0 file:text-xs sm:file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 transition-colors"
                   />
                   {productFormData.previewFoto && (
                     <div className="mt-3">
                       <img
                         src={productFormData.previewFoto}
                         alt="Pratinjau"
-                        className="w-full h-32 object-cover rounded-lg border border-gray-200 shadow-sm"
+                        className="w-full h-28 sm:h-32 object-cover rounded-lg border border-gray-200 shadow-sm"
                       />
                     </div>
                   )}
                 </div>
 
-                <div className="pt-4 flex justify-end gap-3 border-t border-gray-100">
+                <div className="pt-3 sm:pt-4 flex justify-end gap-2 sm:gap-3 border-t border-gray-100">
                   <button
                     type="button"
                     onClick={closeProductModal}
-                    className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                    className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                     disabled={isSubmitting}
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors flex items-center gap-2 shadow-sm"
+                    className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors flex items-center gap-1.5 sm:gap-2 shadow-sm"
                     disabled={isSubmitting}
                   >
                     {isSubmitting ? (
@@ -712,14 +765,14 @@ export default function StoreDetailPage() {
 
       {/* Modal Hapus Produk */}
       {isDeleteModalOpen && productToDelete && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
-            <div className="p-6 text-center">
-              <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4 text-red-600">
-                <i className="fa-solid fa-triangle-exclamation text-3xl"></i>
+            <div className="p-4 sm:p-6 text-center">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3 sm:mb-4 text-red-600">
+                <i className="fa-solid fa-triangle-exclamation text-2xl sm:text-3xl"></i>
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Hapus Produk</h3>
-              <p className="text-sm text-gray-500 mb-4">
+              <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1.5 sm:mb-2">Hapus Produk</h3>
+              <p className="text-xs sm:text-sm text-gray-500 mb-3 sm:mb-4">
                 Tindakan ini permanen. Ketik <span className="font-bold text-gray-800">"{productToDelete.nama}"</span> di bawah ini untuk melanjutkan.
               </p>
               <input
@@ -727,14 +780,14 @@ export default function StoreDetailPage() {
                 value={deleteInputName}
                 onChange={(e) => setDeleteInputName(e.target.value)}
                 placeholder="Ketik nama produk..."
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition-all mb-6 text-center"
+                className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none text-xs sm:text-sm transition-all mb-4 sm:mb-6 text-center"
               />
               
-              <div className="flex gap-3">
+              <div className="flex gap-2 sm:gap-3">
                 <button
                   type="button"
                   onClick={closeDeleteModal}
-                  className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  className="flex-1 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                   disabled={isSubmitting}
                 >
                   Batal
@@ -743,7 +796,7 @@ export default function StoreDetailPage() {
                   type="button"
                   onClick={executeDeleteProduct}
                   disabled={isSubmitting || deleteInputName !== productToDelete.nama}
-                  className={`flex-1 px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors flex items-center justify-center gap-2 ${
+                  className={`flex-1 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-white rounded-lg transition-colors flex items-center justify-center gap-1.5 sm:gap-2 ${
                     deleteInputName === productToDelete.nama 
                       ? 'bg-red-600 hover:bg-red-700 shadow-sm' 
                       : 'bg-red-300 cursor-not-allowed'
@@ -782,12 +835,12 @@ export default function StoreDetailPage() {
       )}
 
       {toast && (
-        <div className="fixed bottom-6 right-6 z-[200] transition-all duration-300 ease-in-out">
-          <div className={`flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-xl text-white font-medium ${
+        <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[200] transition-all duration-300 ease-in-out">
+          <div className={`flex items-center gap-2.5 sm:gap-3 px-4 sm:px-5 py-3 sm:py-3.5 rounded-xl shadow-xl text-white font-medium ${
             toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
           }`}>
-            <i className={`fa-solid ${toast.type === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'} text-xl`}></i>
-            <span className="text-sm tracking-wide">{toast.message}</span>
+            <i className={`fa-solid ${toast.type === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'} text-lg sm:text-xl`}></i>
+            <span className="text-xs sm:text-sm tracking-wide">{toast.message}</span>
           </div>
         </div>
       )}

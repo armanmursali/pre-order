@@ -1,4 +1,3 @@
-// app/(dashboard)/store/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -20,7 +19,7 @@ interface Toko {
   kategori_toko?: {
     nama: string;
   };
-  status_keanggotaan?: string; // [BARU]: Menyimpan status user pada toko tersebut (pemilik/tergabung/pending)
+  status_keanggotaan?: string;
 }
 
 export default function StorePage() {
@@ -65,7 +64,6 @@ export default function StorePage() {
     }, 3000);
   };
   
-  // [PERBAIKAN LOGIKA]: Mengambil daftar toko milik sendiri dan toko yang sudah berstatus 'tergabung'
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -83,7 +81,6 @@ export default function StorePage() {
         setKategoris(dataKategori);
       }
 
-      // Ambil relasi dari tabel user_toko untuk user yang sedang login
       const { data: joinedStores } = await supabase
         .from('user_toko')
         .select('toko_id, status')
@@ -97,17 +94,11 @@ export default function StorePage() {
         ? joinedStores.filter(item => item.status === 'pending').map(item => item.toko_id) 
         : [];
 
-      let query = supabase
-        .from('toko')
-        .select('*, kategori_toko(nama)');
-
-      // Kumpulkan semua ID toko yang relevan untuk user ini (milik sendiri, approved, atau pending)
       const allAccessibleIds = [
         ...approvedStoreIds,
         ...pendingStoreIds
       ];
 
-      // Ambil toko milik sendiri ditambah toko yang berelasi di user_toko
       let { data: dataToko, error: errorToko } = await supabase
         .from('toko')
         .select('*, kategori_toko(nama)')
@@ -116,7 +107,6 @@ export default function StorePage() {
       if (errorToko) {
         console.error('Gagal memuat toko:', errorToko.message);
       } else if (dataToko) {
-        // Tandai status keanggotaan setiap toko untuk user aktif
         const mappedTokos = dataToko
           .filter(toko => toko.user_id === session.user.id || allAccessibleIds.includes(toko.id))
           .map(toko => {
@@ -193,7 +183,6 @@ export default function StorePage() {
     setDeleteInputName('');
   };
 
-  // [PERBAIKAN LOGIKA GABUNG TOKO]: Memastikan pencarian ID bersih dan memasukkan status 'pending'
   const handleJoinStore = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanStoreId = joinStoreId.trim();
@@ -207,7 +196,6 @@ export default function StorePage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) throw new Error('Anda harus login terlebih dahulu.');
 
-      // Validasi apakah toko dengan UUID tersebut benar-benar ada
       const { data: targetToko, error: findError } = await supabase
         .from('toko')
         .select('id, nama, user_id')
@@ -222,7 +210,6 @@ export default function StorePage() {
         throw new Error('Anda adalah pemilik utama toko ini.');
       }
 
-      // Masukkan ke user_toko dengan status awal 'pending'
       const { error: insertError } = await supabase
         .from('user_toko')
         .insert({
@@ -395,16 +382,16 @@ export default function StorePage() {
             return (
               <div key={toko.id} className="relative bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-orange-200 transition-all group flex flex-col overflow-hidden">
                 
-                {/* Badge Status Toko */}
+           
                 <div className="absolute top-3 left-3 z-10">
                   <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm ${
                     toko.status_keanggotaan === 'pemilik' 
-                      ? 'bg-purple-600 text-white' 
+                      ? 'bg-amber-800 text-white' 
                       : toko.status_keanggotaan === 'tergabung' 
-                      ? 'bg-green-600 text-white' 
+                      ? 'bg-orange-600 text-white' 
                       : 'bg-yellow-500 text-white'
                   }`}>
-                    {toko.status_keanggotaan}
+                    {toko.status_keanggotaan === 'pemilik' ? 'toko/store saya' : toko.status_keanggotaan}
                   </span>
                 </div>
 
@@ -451,7 +438,6 @@ export default function StorePage() {
                   </div>
                 )}
 
-                {/* [PENGAMANAN]: Jika status masih pending, klik card tidak bisa masuk ke detail toko */}
                 {isPending ? (
                   <div className="flex flex-col flex-grow cursor-not-allowed opacity-75">
                     <div className="h-44 sm:h-48 w-full bg-gray-100 flex-shrink-0 relative">
