@@ -59,6 +59,12 @@ export default function StorePage() {
         .select('*')
         .order('nama', { ascending: true });
 
+      // [PENAMBAHAN DEBUGGING] Mencetak hasil pengambilan data kategori ke konsol peramban (browser)
+      console.log('--- DEBUGGING KATEGORI ---');
+      console.log('Data Kategori:', dataKategori);
+      console.log('Error Kategori:', errorKategori);
+      console.log('--------------------------');
+
       if (errorKategori) throw errorKategori;
       if (dataKategori) setKategoris(dataKategori);
 
@@ -67,6 +73,12 @@ export default function StorePage() {
         .from('toko')
         .select('*, kategori_toko(nama)')
         .order('created_at', { ascending: false });
+
+      // [PENAMBAHAN DEBUGGING] Mencetak hasil pengambilan data toko
+      console.log('--- DEBUGGING TOKO ---');
+      console.log('Data Toko:', dataToko);
+      console.log('Error Toko:', errorToko);
+      console.log('----------------------');
 
       if (errorToko) throw errorToko;
       if (dataToko) setTokos(dataToko);
@@ -119,7 +131,7 @@ export default function StorePage() {
     setIsModalOpen(true);
   };
 
-  // [PERBAIKAN UTAMA] Menyimpan data toko dan mengunggah foto ke Supabase Storage (bucket foto-toko)
+  // Menyimpan data toko dan mengunggah foto ke Supabase Storage (bucket foto-toko)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
