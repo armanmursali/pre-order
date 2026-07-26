@@ -56,7 +56,7 @@ export default function DashboardLayout({
 
         fetchUnread();
 
-        // [REALTIME DUA ARAH LAYOUT]: Mendengarkan seluruh event INSERT, UPDATE, dan DELETE pada tabel notifikasi
+        // [REALTIME DUA ARAH LAYOUT]: Mendengarkan seluruh event INSERT, UPDATE, dan DELETE pada tabel notifikasi agar badge angka hilang real-time saat dihapus/dibaca
         channel = supabase
           .channel(`layout-notif-realtime-sync-${userId}`)
           .on(
