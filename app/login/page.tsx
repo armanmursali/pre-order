@@ -1,35 +1,34 @@
-// app/login/page.tsx
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-// Mengimpor Supabase client yang telah kita buat di folder utils
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 
 export default function LoginPage() {
   const router = useRouter();
+  
+  const searchParams = useSearchParams();
+  const nextUrl = searchParams.get('next') || '/beranda';
+
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Fungsi untuk menangani proses login menggunakan Google OAuth Supabase
+ 
   const handleGoogleLogin = async () => {
     setError('');
     setLoading(true);
 
     try {
-      // Inisialisasi client Supabase di sisi klien
       const supabase = createClient();
 
-      // Memanggil fungsi signInWithOAuth dari Supabase khusus untuk Google
+    
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          // Mengarahkan kembali ke route handler callback agar PKCE tersimpan dengan aman di cookie server
-          redirectTo: `${window.location.origin}/api/auth/callback`,
+          redirectTo: `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(nextUrl)}`,
         },
       });
 
-      // Menangkap error jika proses inisiasi OAuth gagal
       if (error) {
         throw new Error(error.message || 'Terjadi kesalahan saat login dengan Google.');
       }
