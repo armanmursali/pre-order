@@ -50,7 +50,7 @@ export default function BerandaPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
-  // [STATE OTOMATIS]: Menyimpan daftar item serupa (produk atau toko sejenis) untuk ditampilkan di samping
+  // State untuk rekomendasi produk atau toko serupa di panel samping secara otomatis
   const [similarItems, setSimilarItems] = useState<SearchResultItem[]>([]);
   const [isLoadingSimilar, setIsLoadingSimilar] = useState(false);
 
@@ -141,7 +141,6 @@ export default function BerandaPage() {
         setIsLoadingSimilar(true);
 
         if (firstItem.tipe === 'produk' && firstItem.jenis_produk_id) {
-          // Ambil produk lain dengan jenis_produk_id yang sama secara otomatis
           const { data: simProd } = await supabase
             .from('produk')
             .select('id, toko_id, nama, harga, foto, jenis_produk_id, jenis_produk(nama), toko:toko_id(id, user_id, nama)')
@@ -151,7 +150,6 @@ export default function BerandaPage() {
 
           setSimilarItems((simProd || []).map((p: any) => ({ ...p, tipe: 'produk' as const })));
         } else if (firstItem.tipe === 'toko' && firstItem.kategori_id) {
-          // Ambil toko lain dengan kategori_id yang sama secara otomatis
           const { data: simToko } = await supabase
             .from('toko')
             .select('id, user_id, nama, deskripsi, foto, kategori_id, kategori_toko(nama)')
@@ -295,7 +293,8 @@ export default function BerandaPage() {
                   } else {
                     const storeOwnerId = item.toko?.user_id;
                     const isMyStore = storeOwnerId === currentUserId;
-                    const targetHref = isMyStore ? `/store/${item.toko_id}` : `/search/produk/${item.id}`;
+                    // [PENYESUAIAN RUTE PUBLIK]: Mengarahkan ke rute rata /search-produk/[id] agar bebas dari error 404 Vercel
+                    const targetHref = isMyStore ? `/store/${item.toko_id}` : `/search-produk/${item.id}`;
 
                     return (
                       <Link
@@ -382,7 +381,8 @@ export default function BerandaPage() {
                         } else {
                           const storeOwnerId = sim.toko?.user_id;
                           const isMyStore = storeOwnerId === currentUserId;
-                          const simTargetHref = isMyStore ? `/store/${sim.toko_id}` : `/search/produk/${sim.id}`;
+                          // [PENYESUAIAN RUTE PRODUK SERUPA]: Mengarahkan ke /search-produk/[id]
+                          const simTargetHref = isMyStore ? `/store/${sim.toko_id}` : `/search-produk/${sim.id}`;
 
                           return (
                             <Link

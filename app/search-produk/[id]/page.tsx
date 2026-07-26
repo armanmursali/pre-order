@@ -1,4 +1,4 @@
-// app/(dashboard)/search/produk/[id]/page.tsx
+// app/(dashboard)/search-produk/[id]/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -37,7 +37,7 @@ export default function PublicProductDetailPage() {
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // [PERBAIKAN PRESISI PARAMS]: Memastikan ekstraksi ID aman dari struktur objek Next.js
+  // [LOGIKA PRESISI]: Mengambil ID parameter rute secara aman dan sinkron
   useEffect(() => {
     const resolveParams = async () => {
       if (params && params.id) {
@@ -63,7 +63,7 @@ export default function PublicProductDetailPage() {
     }).format(angka);
   };
 
-  // [FUNGSI AMBIL DATA PRODUK PUBLIK]: Mengambil detail produk beserta informasi toko pemiliknya secara aman
+  // [FUNGSI AMBIL DATA PRODUK PUBLIK]: Mengambil detail produk beserta informasi toko pemiliknya dari Supabase
   const fetchPublicProductData = async (targetId: string) => {
     try {
       setLoading(true);
@@ -72,7 +72,7 @@ export default function PublicProductDetailPage() {
         .from('produk')
         .select('*, jenis_produk(nama), toko:toko_id(id, user_id, nama, telepon, alamat, rekening, metode_pembayaran)')
         .eq('id', targetId)
-        .maybeSingle(); // Menggunakan maybeSingle agar tidak memicu exception 404 mentah pada server jika data kosong
+        .maybeSingle();
 
       if (errorProduk || !dataProduk) {
         showToast('Produk tidak ditemukan di database.', 'error');
@@ -102,7 +102,7 @@ export default function PublicProductDetailPage() {
       <div className="bg-white text-gray-800 rounded-xl shadow-sm border border-gray-200 p-12 text-center">
         <i className="fa-solid fa-triangle-exclamation text-4xl text-amber-600 mb-3"></i>
         <h2 className="text-lg font-bold text-gray-800 mb-1">Produk Tidak Ditemukan</h2>
-        <p className="text-xs sm:text-sm text-gray-500 mb-6">Produk dengan ID tersebut mungkin telah dihapus atau URL tidak valid.</p>
+        <p className="text-xs sm:text-sm text-gray-500 mb-6">Produk dengan ID tersebut tidak ditemukan di server.</p>
         <button
           onClick={() => router.push('/beranda')}
           className="bg-amber-800 hover:bg-amber-900 text-white px-5 py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors"
