@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { navMenus } from '../menu'; 
-// [PENAMBAHAN] Mengimpor komponen Notifikasi yang baru dibuat
 import Notification from '../components/Notification';
 
 export default function DashboardLayout({
@@ -17,39 +16,76 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   
-  // State bawaan Anda untuk kontrol sidebar mobile
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  // State bawaan Anda untuk menyimpan nama pengguna
   const [userName, setUserName] = useState<string>('Administrator');
-
-  // [PENAMBAHAN] State untuk mengontrol sidebar mengecil di desktop (collapse)
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
-  // [PENAMBAHAN] State untuk mengontrol visibilitas panel Notifikasi
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState<number>(0); // [BARU]: State jumlah notifikasi belum dibaca
 
-  // Mengambil data nama pengguna secara spesifik dari kolom 'nama' di tabel public.users (Logic Tidak Diubah)
   useEffect(() => {
-    const fetchUserData = async () => {
-      const supabase = createClient();
+    const supabase = createClient();
+    let channel: any;
+
+    const fetchUserDataAndNotifs = async () => {
       const { data: { session } } = await supabase.auth.getSession();
 
       if (session?.user) {
+        const userId = session.user.id;
+
+        // Ambil nama user
         const { data: userData, error } = await supabase
           .from('users')
           .select('nama')
-          .eq('id', session.user.id)
+          .eq('id', userId)
           .maybeSingle();
 
         if (!error && userData && userData.nama) {
           setUserName(userData.nama);
         }
+
+        // Ambil jumlah notifikasi belum dibaca
+        const fetchUnread = async () => {
+          const { count, error: countErr } = await supabase
+            .from('notifikasi')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .eq('is_read', false);
+
+          if (!countErr && count !== null) {
+            setUnreadCount(count);
+          }
+        };
+
+        fetchUnread();
+
+        // Realtime update untuk badge lonceng
+        channel = supabase
+          .channel('layout-notif-badge')
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'notifikasi',
+              filter: `user_id=eq.${userId}`,
+            },
+            () => {
+              fetchUnread();
+            }
+          )
+          .subscribe();
       }
     };
 
-    fetchUserData();
+    fetchUserDataAndNotifs();
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
   }, []);
 
-  // Fungsi untuk menangani proses keluar (Logout) pengguna (Logic Tidak Diubah)
   const handleLogout = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -58,7 +94,6 @@ export default function DashboardLayout({
 
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">
-      {/* Overlay latar belakang gelap untuk mode mobile ketika sidebar terbuka */}
       {sidebarOpen && (
         <div
           onClick={() => setSidebarOpen(false)}
@@ -66,23 +101,18 @@ export default function DashboardLayout({
         />
       )}
 
-      {/* Sidebar Navigasi Utama */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 flex flex-col bg-white border-r border-gray-200 transition-all duration-300 ease-in-out md:static md:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } ${isDesktopCollapsed ? 'md:w-20' : 'md:w-64'} w-64`} 
-        /* [PERBAIKAN TAMPILAN] Lebar menyesuaikan state isDesktopCollapsed (w-20 atau w-64) */
       >
-        {/* Header Sidebar dengan Logo dan Teks AtributShop */}
         <div className={`flex h-16 items-center px-6 border-b border-gray-200 ${isDesktopCollapsed ? 'justify-center' : 'justify-between'}`}>
           <div className="flex items-center gap-3">
             <img src="/logo.png" alt="Logo AtributShop" className="w-8 h-8 object-contain shrink-0" />
-            {/* Teks logo disembunyikan jika sedang di-collapse di desktop */}
             <span className={`text-xl font-bold text-gray-800 transition-opacity duration-300 ${isDesktopCollapsed ? 'hidden md:hidden' : 'block'}`}>
               AtributShop
             </span>
           </div>
-          {/* Tombol tutup sidebar hanya muncul di layar Mobile */}
           <button
             onClick={() => setSidebarOpen(false)}
             className="md:hidden text-gray-500 hover:text-gray-700 focus:outline-none ml-auto"
@@ -91,7 +121,6 @@ export default function DashboardLayout({
           </button>
         </div>
 
-        {/* Daftar Tautan Menu Navigasi yang dimuat dari menu.ts */}
         <nav className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
           {navMenus.map((menu) => {
             const isActive = pathname === menu.href;
@@ -106,10 +135,9 @@ export default function DashboardLayout({
                     ? 'bg-blue-50 text-blue-600'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }`}
-                title={isDesktopCollapsed ? menu.name : undefined} // Memunculkan nama menu sebagai tooltip saat di-hover dalam mode collapse
+                title={isDesktopCollapsed ? menu.name : undefined}
               >
                 <i className={`${menu.icon} text-lg text-center ${isDesktopCollapsed ? '' : 'w-5'}`}></i>
-                {/* Teks menu disembunyikan jika sedang di-collapse */}
                 <span className={`${isDesktopCollapsed ? 'hidden' : 'block whitespace-nowrap'}`}>
                   {menu.name}
                 </span>
@@ -118,7 +146,6 @@ export default function DashboardLayout({
           })}
         </nav>
 
-        {/* Bagian Bawah Sidebar: Tombol Keluar / Logout */}
         <div className="p-4 border-t border-gray-200">
           <button
             onClick={handleLogout}
@@ -128,7 +155,6 @@ export default function DashboardLayout({
             title={isDesktopCollapsed ? 'Keluar (Logout)' : undefined}
           >
             <i className="fa-solid fa-right-from-bracket text-lg"></i>
-            {/* Teks Keluar disembunyikan jika sedang di-collapse */}
             <span className={`${isDesktopCollapsed ? 'hidden' : 'block whitespace-nowrap'}`}>
               Keluar (Logout)
             </span>
@@ -136,19 +162,15 @@ export default function DashboardLayout({
         </div>
       </aside>
 
-      {/* Area Konten Utama */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Header Atas untuk Mode Mobile dan Desktop */}
         <header className="flex h-16 items-center justify-between bg-white border-b border-gray-200 px-6 z-30">
           <div className="flex items-center gap-4">
-            {/* Tombol Buka/Tutup Sidebar untuk Mobile */}
             <button
               onClick={() => setSidebarOpen(true)}
               className="md:hidden text-gray-500 hover:text-gray-700 focus:outline-none transition"
             >
               <i className="fa-solid fa-bars text-xl"></i>
             </button>
-            {/* [PENAMBAHAN] Tombol Collapse Sidebar untuk Desktop */}
             <button
               onClick={() => setIsDesktopCollapsed(!isDesktopCollapsed)}
               className="hidden md:flex text-gray-500 hover:text-gray-700 focus:outline-none transition items-center justify-center w-8 h-8 rounded-full hover:bg-gray-100"
@@ -158,22 +180,21 @@ export default function DashboardLayout({
           </div>
 
           <div className="flex items-center gap-5 ml-auto">
-            {/* [PENAMBAHAN] Tombol Lonceng Notifikasi */}
+            {/* Tombol Lonceng Notifikasi dengan Badge Real-Time */}
             <button 
               onClick={() => setIsNotifOpen(true)}
-              className="relative text-gray-500 hover:text-blue-600 transition-colors focus:outline-none"
+              className="relative text-gray-500 hover:text-amber-800 transition-colors focus:outline-none"
             >
               <i className="fa-regular fa-bell text-xl"></i>
-              {/* Badge indikator merah di lonceng */}
-              <span className="absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-red-500 text-[8px] text-white ring-2 ring-white">
-                3
-              </span>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white ring-2 ring-white">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </button>
 
-            {/* Menampilkan nama pengguna secara dinamis dari kolom nama */}
             <div className="flex items-center gap-2 pl-4 border-l border-gray-200">
-              <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-sm">
-                {/* Mengambil huruf pertama nama pengguna sebagai avatar */}
+              <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-sm">
                 {userName.charAt(0).toUpperCase()}
               </div>
               <span className="text-sm font-semibold text-gray-700 hidden sm:block">{userName}</span>
@@ -181,13 +202,11 @@ export default function DashboardLayout({
           </div>
         </header>
 
-        {/* Konten Halaman Dinamis */}
         <main className="flex-1 overflow-y-auto p-6 bg-gray-50">
           {children}
         </main>
       </div>
 
-      {/* [PENAMBAHAN] Memanggil Komponen Notifikasi di Luar Flow Konten agar Bebas Menimpa Layar */}
       <Notification isOpen={isNotifOpen} onClose={() => setIsNotifOpen(false)} />
     </div>
   );

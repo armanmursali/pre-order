@@ -4,6 +4,8 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
+// [BARU]: Mengimpor helper notifikasi untuk mengirim pemberitahuan ke pemilik toko
+import { sendNotification } from '@/utils/notificationHelper';
 
 interface Kategori {
   id: string;
@@ -17,7 +19,7 @@ interface Toko {
   nama: string;
   deskripsi?: string | null;
   foto: string | null;
-  anggota?: any[]; // [BARU]: Menyimpan daftar anggota langsung di tabel toko
+  anggota?: any[]; 
   kategori_toko?: {
     nama: string;
   };
@@ -66,7 +68,6 @@ export default function StorePage() {
     }, 3000);
   };
   
-  // [LOGIKA UTAMA]: Mengambil semua toko dan mengecek status keanggotaan user dari kolom JSONB 'anggota'
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -108,7 +109,7 @@ export default function StorePage() {
             } else if (foundMember?.status === 'pending') {
               status = 'pending';
             } else if (!isPrimaryOwner && !foundMember) {
-              return null; // Toko yang sama sekali tidak berelasi dengan user tidak ditampilkan
+              return null;
             }
 
             return { ...toko, status_keanggotaan: status, anggota: listAnggota };
@@ -178,7 +179,7 @@ export default function StorePage() {
     setDeleteInputName('');
   };
 
-  // [LOGIKA GABUNG TOKO]: Menambahkan data user ke dalam array JSONB kolom 'anggota' di tabel 'toko'
+  // [LOGIKA GABUNG TOKO + NOTIFIKASI PEMILIK]: Menambahkan data ke array anggota dan mengirim notifikasi real-time ke pemilik toko
   const handleJoinStore = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanStoreId = joinStoreId.trim();
@@ -220,10 +221,13 @@ export default function StorePage() {
         .eq('id', session.user.id)
         .maybeSingle();
 
+      const userName = userData?.nama || session.user.user_metadata?.name || 'Pengguna';
+      const userEmail = userData?.email || session.user.email || '';
+
       const newMember = {
         user_id: session.user.id,
-        nama: userData?.nama || session.user.user_metadata?.name || 'Pengguna',
-        email: userData?.email || session.user.email || '',
+        nama: userName,
+        email: userEmail,
         status: 'pending'
       };
 
@@ -235,6 +239,13 @@ export default function StorePage() {
         .eq('id', targetToko.id);
 
       if (updateError) throw updateError;
+
+      // [BARU]: Kirim notifikasi ke pemilik utama toko (targetToko.user_id)
+      await sendNotification(
+        targetToko.user_id,
+        'Permintaan Gabung Toko',
+        `Pengguna "${userName}" (${userEmail}) meminta untuk bergabung ke toko "${targetToko.nama}".`
+      );
 
       showToast(`Permintaan gabung ke toko "${targetToko.nama}" dikirim (Status: Pending)!`, 'success');
       setIsJoinModalOpen(false);

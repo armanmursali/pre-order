@@ -125,7 +125,6 @@ export default function StoreDetailPage() {
       const primaryOwnerId = dataToko.user_id;
       const isPrimaryOwner = primaryOwnerId === userId;
       
-      // Pastikan pemilik utama selalu ada dalam daftar array anggota
       const ownerExists = listAnggota.some((m: any) => m.user_id === primaryOwnerId);
       if (!ownerExists) {
         const { data: ownerProfile } = await supabase
@@ -150,7 +149,6 @@ export default function StoreDetailPage() {
 
       const isApproved = memberEntry?.status === 'tergabung';
 
-      // PENGAMANAN: Jika user bukan pemilik dan bukan anggota tergabung/pending, tolak akses
       if (!isUserOwner && !isApproved && memberEntry?.status !== 'pending') {
         showToast('Anda tidak memiliki akses ke toko ini.', 'error');
         router.push('/store');
@@ -181,7 +179,6 @@ export default function StoreDetailPage() {
     }
   };
 
-  // [PERBAIKAN LOGIKA KICK / KELUAR]: Memastikan penghapusan anggota (termasuk sesama pemilik atau pemilik utama jika dikick) membersihkan data dari array anggota
   const handleUpdateAnggotaStatus = async (targetUserId: string, newStatus: string) => {
     if (!toko) return;
     try {
@@ -192,13 +189,10 @@ export default function StoreDetailPage() {
       let updatedAnggota = [...currentAnggota];
 
       if (newStatus === 'keluar' || newStatus === 'kick') {
-        // Hapus user dari array anggota
         updatedAnggota = updatedAnggota.filter((m: any) => m.user_id !== targetUserId);
 
-        // [LOGIKA TAMBAHAN]: Jika yang di-kick adalah pemilik utama (toko.user_id), kita pindahkan kepemilikan utama ke anggota lain atau hapus relasi user_id di tabel toko
         let updatePayload: any = { anggota: updatedAnggota };
         if (targetUserId === toko.user_id) {
-          // Jika pemilik utama dikeluarkan, cari pemilik/anggota lain untuk dijadikan user_id utama, atau set null jika kosong
           const remainingOwner = updatedAnggota.find((m: any) => m.status === 'pemilik');
           if (remainingOwner) {
             updatePayload.user_id = remainingOwner.user_id;
@@ -215,7 +209,6 @@ export default function StoreDetailPage() {
 
         if (error) throw error;
       } else {
-        // Pembaruan status (misal: 'tergabung' atau 'pemilik')
         updatedAnggota = updatedAnggota.map((m: any) => {
           if (m.user_id === targetUserId) {
             return { ...m, status: newStatus };
@@ -414,6 +407,7 @@ export default function StoreDetailPage() {
     return null;
   }
 
+  // [PERBAIKAN TYPINGS]: Menggunakan array kosong [] sebagai fallback agar bertipe any[] dan mendukung .map()
   const listAnggota = Array.isArray(toko.anggota) ? toko.anggota : [];
 
   return (
@@ -703,7 +697,6 @@ export default function StoreDetailPage() {
                                 <i className="fa-solid fa-user-shield w-4"></i> Ubah Jadi Pemilik
                               </button>
                             )}
-                            {/* [LOGIKA UTAMA]: Jika mendeteksi diri sendiri, teks aksi menjadi 'Keluar'. Jika mendeteksi anggota lain (termasuk pemilik lain), teks menjadi 'Keluarkan' dan menghapus data total dari tabel */}
                             <button
                               onClick={() => handleUpdateAnggotaStatus(item.user_id, isMe ? 'keluar' : 'kick')}
                               className="w-full text-left px-4 py-2 text-xs sm:text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors font-medium"
