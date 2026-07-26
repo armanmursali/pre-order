@@ -28,7 +28,7 @@ export async function kirimpesanpermintaanmasuktoko(
     const safeUserEmail = userEmail || 'Email tidak tersedia';
 
     // Menyisipkan format ID toko di dalam string pesan agar mudah diurai (parsing) oleh helper aksi notifikasi
-    const structuredMessage = `Pengguna "${safeUserName}" (${safeUserEmail}) meminta untuk bergabung ke toko "${safeStoreName}". [STORE_ID:${storeId}]`;
+    const structuredMessage = `Pengguna "${safeUserName}" (${safeUserEmail}) meminta untuk bergabung ke toko "${safeStoreName}". `;
 
     const { error } = await supabase
       .from('notifikasi')
