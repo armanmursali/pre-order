@@ -1,0 +1,226 @@
+// app/(dashboard)/pesanan/page.tsx
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/utils/supabase/client';
+import Link from 'next/link';
+
+interface PesananItem {
+  id: string;
+  nomor_pesanan: number;
+  jumlah: number;
+  total_harga: number;
+  metode_pilihan: string;
+  bukti_transfer?: string | null;
+  status: string;
+  alamat_pembeli?: string | null;
+  telepon_pembeli?: string | null;
+  created_at: string;
+  produk?: {
+    id: string;
+    nama: string;
+    harga: number;
+    foto: string | null;
+  };
+  toko?: {
+    id: string;
+    nama: string;
+  };
+}
+
+export default function PesananPage() {
+  const router = useRouter();
+  const supabase = createClient();
+
+  const [pesananList, setPesananList] = useState<PesananItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+
+  // Memeriksa sesi pengguna dan mengambil daftar pesanan milik user aktif
+  useEffect(() => {
+    async function fetchUserPesanan() {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        router.push('/login');
+        return;
+      }
+
+      const userId = session.user.id;
+
+      // Ambil data pesanan di mana pembeli_id adalah user yang sedang login
+      const { data, error } = await supabase
+        .from('pesanan')
+        .select(`
+          id,
+          nomor_pesanan,
+          jumlah,
+          total_harga,
+          metode_pilihan,
+          bukti_transfer,
+          status,
+          alamat_pembeli,
+          telepon_pembeli,
+          created_at,
+          produk:produk_id(id, nama, harga, foto),
+          toko:toko_id(id, nama)
+        `)
+        .eq('pembeli_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Gagal memuat data pesanan:', error.message);
+      } else if (data) {
+        setPesananList(data as PesananItem[]);
+      }
+
+      setLoading(false);
+    }
+
+    fetchUserPesanan();
+  }, [router, supabase]);
+
+  const formatRupiah = (angka: number) => {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0,
+    }).format(angka);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center bg-white text-gray-800 p-12">
+        <i className="fa-solid fa-circle-notch fa-spin text-3xl text-orange-600 mb-2"></i>
+        <p className="text-gray-500 font-medium ml-3">Memuat daftar pesanan Anda...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 bg-white text-gray-900 min-h-screen p-0.5 sm:p-6">
+      {/* Header Halaman Pesanan */}
+      <div className="rounded-xl bg-white p-6 shadow-sm border border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-amber-900 mb-1">
+            Daftar Pesanan Saya
+          </h1>
+          <p className="text-xs sm:text-sm text-gray-500">
+            Pantau status pesanan, rincian produk, dan riwayat transaksi Anda di sini.
+          </p>
+        </div>
+        <Link
+          href="/beranda"
+          className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-colors shadow-sm flex items-center gap-2"
+        >
+          <i className="fa-solid fa-magnifying-glass"></i>
+          <span>Cari Produk Lain</span>
+        </Link>
+      </div>
+
+      {/* Daftar Pesanan */}
+      {pesananList.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-xl border border-gray-200 text-gray-500 shadow-sm">
+          <i className="fa-solid fa-receipt text-4xl mb-3 text-gray-300 block"></i>
+          <h2 className="text-base font-bold text-gray-800 mb-1">Belum Ada Pesanan</h2>
+          <p className="text-xs sm:text-sm text-gray-500 mb-4">Anda belum pernah melakukan pemesanan produk apapun.</p>
+          <Link
+            href="/beranda"
+            className="inline-flex items-center gap-2 bg-amber-800 hover:bg-amber-900 text-white px-5 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-colors"
+          >
+            Mulai Belanja Sekarang
+          </Link>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4">
+          {pesananList.map((item) => (
+            <div 
+              key={item.id} 
+              className="bg-white border border-gray-200 rounded-xl shadow-sm hover:border-orange-200 transition-all p-4 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6"
+            >
+              {/* Bagian Kiri: Info Produk & Toko */}
+              <div className="flex items-start gap-4 flex-grow">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center border border-gray-200 cursor-pointer" onClick={() => item.produk?.foto && setPreviewImageUrl(item.produk.foto)}>
+                  {item.produk?.foto ? (
+                    <img src={item.produk.foto} alt={item.produk.nama} className="w-full h-full object-cover" />
+                  ) : (
+                    <i className="fa-solid fa-box text-xl text-gray-400"></i>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
+                      No. Pesanan: #{item.nomor_pesanan || '-'}
+                    </span>
+                    <span className="text-xs text-gray-500 font-medium">
+                      di Toko <strong className="text-amber-900">{item.toko?.nama || 'Toko'}</strong>
+                    </span>
+                  </div>
+
+                  <h3 className="text-base font-bold text-gray-900">
+                    {item.produk?.nama || 'Produk'}
+                  </h3>
+
+                  <p className="text-xs text-gray-500">
+                    Jumlah: <strong className="text-gray-900">{item.jumlah} item</strong> | Total: <strong className="text-amber-900">{formatRupiah(item.total_harga)}</strong>
+                  </p>
+
+                  <p className="text-[11px] text-gray-400">
+                    Metode: <span className="font-semibold text-gray-700">{item.metode_pilihan}</span> | Tanggal: {new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+              </div>
+
+              {/* Bagian Kanan: Status & Bukti Transfer */}
+              <div className="flex flex-col sm:flex-row md:flex-col items-end justify-between w-full md:w-auto gap-3 border-t md:border-t-0 pt-3 md:pt-0 border-gray-100">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500">Status:</span>
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                    item.status === 'Diterima' 
+                      ? 'bg-green-100 text-green-800 border border-green-200' 
+                      : 'bg-amber-100 text-amber-800 border border-amber-200'
+                  }`}>
+                    {item.status || 'Belum Diterima'}
+                  </span>
+                </div>
+
+                {item.bukti_transfer && (
+                  <button
+                    type="button"
+                    onClick={() => setPreviewImageUrl(item.bukti_transfer!)}
+                    className="text-xs text-orange-600 hover:text-orange-700 font-semibold flex items-center gap-1.5 bg-orange-50 px-3 py-1.5 rounded-lg border border-orange-100 transition-colors"
+                  >
+                    <i className="fa-solid fa-file-image"></i>
+                    <span>Lihat Bukti Transfer</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Modal Preview Gambar */}
+      {previewImageUrl && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md" onClick={() => setPreviewImageUrl(null)}>
+          <div className="relative max-w-4xl w-full max-h-[90vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setPreviewImageUrl(null)}
+              className="absolute -top-12 right-0 text-white hover:text-orange-400 transition-colors text-3xl font-bold"
+              title="Tutup"
+            >
+              <i className="fa-solid fa-xmark"></i>
+            </button>
+            <img
+              src={previewImageUrl}
+              alt="Pratinjau Penuh"
+              className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl border border-gray-700 bg-white"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
