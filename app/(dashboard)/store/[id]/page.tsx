@@ -22,8 +22,8 @@ interface AnggotaToko {
   id: string;
   user_id: string;
   status: string;
-  nama_user?: string; // [PERBAIKAN]: Menampung nama user
-  email_user?: string; // [PERBAIKAN]: Menampung email user
+  nama_user?: string;
+  email_user?: string;
 }
 
 interface JenisProduk {
@@ -141,21 +141,32 @@ export default function StoreDetailPage() {
 
       setToko(dataToko);
 
-      // [PERBAIKAN]: Mengambil daftar anggota toko beserta relasi ke tabel public.users (nama & email) jika tersedia
+      // [PERBAIKAN PRESISI]: Mengambil data anggota toko dari user_toko lalu mencocokkan namanya dari tabel public.users secara aman
       const { data: dataAnggota } = await supabase
         .from('user_toko')
-        .select('*, users(nama, email)')
+        .select('*')
         .eq('toko_id', tokoId);
       
-      if (dataAnggota) {
-        const formattedAnggota = dataAnggota.map((item: any) => ({
-          id: item.id,
-          user_id: item.user_id,
-          status: item.status,
-          nama_user: item.users?.nama || 'Pengguna Tanpa Nama',
-          email_user: item.users?.email || 'Email tidak tersedia',
-        }));
+      if (dataAnggota && dataAnggota.length > 0) {
+        const userIds = dataAnggota.map(a => a.user_id);
+        const { data: dataUsers } = await supabase
+          .from('users')
+          .select('id, nama, email')
+          .in('id', userIds);
+
+        const formattedAnggota = dataAnggota.map((item: any) => {
+          const matchedUser = dataUsers?.uomap ? null : dataUsers?.find((u: any) => u.id === item.user_id);
+          return {
+            id: item.id,
+            user_id: item.user_id,
+            status: item.status,
+            nama_user: matchedUser?.nama || 'Pengguna Terdaftar',
+            email_user: matchedUser?.email || 'Email tidak tersedia',
+          };
+        });
         setAnggotas(formattedAnggota);
+      } else {
+        setAnggotas([]);
       }
 
       const { data: dataJenis } = await supabase
@@ -408,7 +419,7 @@ export default function StoreDetailPage() {
                 anggotas.map((item) => (
                   <div key={item.id} className="py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative">
                     <div className="overflow-hidden">
-                      {/* [PERBAIKAN]: Menampilkan Nama dan Email alih-alih ID User */}
+                      {/* [PERBAIKAN]: Menampilkan Nama dan Email user yang diambil dari tabel public.users */}
                       <h4 className="font-bold text-gray-900 text-xs sm:text-sm">{item.nama_user}</h4>
                       <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5">{item.email_user}</p>
                       <span className={`inline-block mt-1.5 px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold uppercase tracking-wider ${
