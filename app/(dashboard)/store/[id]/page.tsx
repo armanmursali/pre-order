@@ -13,17 +13,10 @@ interface TokoDetail {
   deskripsi?: string | null;
   foto: string | null;
   created_at: string;
+  anggota?: any[]; // [BARU]: Menyimpan array daftar anggota
   kategori_toko?: {
     nama: string;
   };
-}
-
-interface AnggotaToko {
-  id: string;
-  user_id: string;
-  status: string;
-  nama_user?: string;
-  email_user?: string;
 }
 
 interface JenisProduk {
@@ -52,7 +45,6 @@ export default function StoreDetailPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [isOwner, setIsOwner] = useState<boolean>(false);
 
-  const [anggotas, setAnggotas] = useState<AnggotaToko[]>([]);
   const [isMemberListOpen, setIsMemberListOpen] = useState<boolean>(false); 
   const [activeMemberDropdown, setActiveMemberDropdown] = useState<string | null>(null); 
 
@@ -119,19 +111,16 @@ export default function StoreDetailPage() {
         return;
       }
 
-      const { data: membership } = await supabase
-        .from('user_toko')
-        .select('status')
-        .eq('toko_id', tokoId)
-        .eq('user_id', session.user.id)
-        .maybeSingle();
-
-      const primaryOwner = dataToko.user_id === session.user.id;
-      const isMemberOwner = membership?.status === 'pemilik';
+      const userId = session.user.id;
+      const listAnggota = Array.isArray(dataToko.anggota) ? dataToko.anggota : [];
+      const primaryOwner = dataToko.user_id === userId;
+      const memberEntry = listAnggota.find((m: any) => m.user_id === userId);
+      const isMemberOwner = memberEntry?.status === 'pemilik';
       const isUserOwner = primaryOwner || isMemberOwner;
+
       setIsOwner(isUserOwner);
 
-      const isApproved = membership?.status === 'tergabung';
+      const isApproved = memberEntry?.status === 'tergabung';
 
       if (!isUserOwner && !isApproved) {
         showToast('Anda belum disetujui atau tidak memiliki akses ke toko ini.', 'error');
@@ -139,35 +128,7 @@ export default function StoreDetailPage() {
         return;
       }
 
-      setToko(dataToko);
-
-      const { data: dataAnggota } = await supabase
-        .from('user_toko')
-        .select('*')
-        .eq('toko_id', tokoId);
-      
-      if (dataAnggota && dataAnggota.length > 0) {
-        const userIds = dataAnggota.map(a => a.user_id);
-        const { data: dataUsers } = await supabase
-          .from('users')
-          .select('id, nama, email')
-          .in('id', userIds);
-
-        // [PERBAIKAN PRESISI]: Memperbaiki kesalahan ketik 'uomap' menjadi pencarian data user yang bersih
-        const formattedAnggota = dataAnggota.map((item: any) => {
-          const matchedUser = dataUsers?.find((u: any) => u.id === item.user_id);
-          return {
-            id: item.id,
-            user_id: item.user_id,
-            status: item.status,
-            nama_user: matchedUser?.nama || 'Pengguna Terdaftar',
-            email_user: matchedUser?.email || 'Email tidak tersedia',
-          };
-        });
-        setAnggotas(formattedAnggota);
-      } else {
-        setAnggotas([]);
-      }
+      setToko({ ...dataToko, anggota: listAnggota });
 
       const { data: dataJenis } = await supabase
         .from('jenis_produk')
@@ -191,32 +152,44 @@ export default function StoreDetailPage() {
     }
   };
 
-  const handleUpdateAnggotaStatus = async (anggotaId: string, newStatus: string) => {
+  // [BARU]: Manajemen status anggota melalui kolom JSONB 'anggota' di tabel 'toko'
+  const handleUpdateAnggotaStatus = async (targetUserId: string, newStatus: string) => {
+    if (!toko) return;
     try {
       setIsSubmitting(true);
       setActiveMemberDropdown(null);
 
+      const currentAnggota = Array.isArray(toko.anggota) ? toko.anggota : [];
+      let updatedAnggota = [...currentAnggota];
+
       if (newStatus === 'kick') {
-        const { error } = await supabase
-          .from('user_toko')
-          .delete()
-          .eq('id', anggotaId);
-        if (error) throw error;
-        showToast('Anggota berhasil dikeluarkan dari toko.', 'success');
+        updatedAnggota = updatedAnggota.filter((m: any) => m.user_id !== targetUserId);
       } else {
-        const { error } = await supabase
-          .from('user_toko')
-          .update({ status: newStatus })
-          .eq('id', anggotaId);
-        if (error) throw error;
-        showToast(
-          newStatus === 'pemilik' 
-            ? 'Anggota berhasil diubah menjadi Pemilik toko!' 
-            : 'Status anggota berhasil diperbarui menjadi Tergabung!', 
-          'success'
-        );
+        updatedAnggota = updatedAnggota.map((m: any) => {
+          if (m.user_id === targetUserId) {
+            return { ...m, status: newStatus };
+          }
+          return m;
+        });
       }
-      if (toko?.id) fetchAllData(toko.id);
+
+      const { error } = await supabase
+        .from('toko')
+        .update({ anggota: updatedAnggota })
+        .eq('id', toko.id);
+
+      if (error) throw error;
+
+      showToast(
+        newStatus === 'kick' 
+          ? 'Anggota berhasil dikeluarkan.' 
+          : newStatus === 'pemilik' 
+          ? 'Anggota berhasil diubah menjadi Pemilik toko!' 
+          : 'Status anggota berhasil diperbarui menjadi Tergabung!', 
+        'success'
+      );
+
+      fetchAllData(toko.id);
     } catch (error: any) {
       showToast('Gagal memperbarui status anggota: ' + error.message, 'error');
     } finally {
@@ -384,6 +357,8 @@ export default function StoreDetailPage() {
     return null;
   }
 
+  const listAnggota = Array.isArray(toko.anggota) ? toko.anggota : [];
+
   return (
     <div className="space-y-6 relative p-0.5 sm:p-6">
       
@@ -397,7 +372,7 @@ export default function StoreDetailPage() {
         />
       )}
 
-      {/* Panel Anggota Toko */}
+      {/* Panel Daftar Anggota di Detail Toko (Default Tertutup) */}
       {isOwner && (
         <div className="bg-amber-50/60 rounded-xl shadow-sm border border-amber-200">
           <button
@@ -406,21 +381,21 @@ export default function StoreDetailPage() {
           >
             <span className="flex items-center gap-2">
               <i className="fa-solid fa-users text-amber-800"></i> 
-              Daftar Anggota & Pengajuan Toko ({anggotas.length})
+              Daftar Anggota & Pengajuan Toko ({listAnggota.length})
             </span>
             <i className={`fa-solid fa-chevron-down transition-transform ${isMemberListOpen ? 'rotate-180' : ''}`}></i>
           </button>
 
           {isMemberListOpen && (
             <div className="p-4 sm:p-6 divide-y divide-amber-100 overflow-visible">
-              {anggotas.length === 0 ? (
+              {listAnggota.length === 0 ? (
                 <p className="text-xs sm:text-sm text-gray-500 italic py-2">Belum ada anggota lain di toko ini.</p>
               ) : (
-                anggotas.map((item) => (
-                  <div key={item.id} className="py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative">
+                listAnggota.map((item: any) => (
+                  <div key={item.user_id} className="py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative">
                     <div className="overflow-hidden">
-                      <h4 className="font-bold text-gray-900 text-xs sm:text-sm">{item.nama_user}</h4>
-                      <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5">{item.email_user}</p>
+                      <h4 className="font-bold text-gray-900 text-xs sm:text-sm">{item.nama || 'Pengguna'}</h4>
+                      <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5">{item.email || 'Email tidak tersedia'}</p>
                       <span className={`inline-block mt-1.5 px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold uppercase tracking-wider ${
                         item.status === 'pemilik' 
                           ? 'bg-amber-800 text-white' 
@@ -436,7 +411,7 @@ export default function StoreDetailPage() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          setActiveMemberDropdown(activeMemberDropdown === item.id ? null : item.id);
+                          setActiveMemberDropdown(activeMemberDropdown === item.user_id ? null : item.user_id);
                         }}
                         className="w-8 h-8 rounded-full bg-white text-gray-600 hover:bg-orange-100 hover:text-orange-700 flex items-center justify-center transition-colors shadow-sm border border-gray-200"
                         title="Aksi Anggota"
@@ -444,11 +419,11 @@ export default function StoreDetailPage() {
                         <i className="fa-solid fa-ellipsis-vertical"></i>
                       </button>
 
-                      {activeMemberDropdown === item.id && (
+                      {activeMemberDropdown === item.user_id && (
                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-xl border border-gray-200 z-50 py-1">
                           {item.status === 'pending' && (
                             <button
-                              onClick={() => handleUpdateAnggotaStatus(item.id, 'tergabung')}
+                              onClick={() => handleUpdateAnggotaStatus(item.user_id, 'tergabung')}
                               className="w-full text-left px-4 py-2 text-xs sm:text-sm text-green-700 hover:bg-green-50 flex items-center gap-2 transition-colors font-medium"
                             >
                               <i className="fa-solid fa-check w-4"></i> Terima
@@ -456,14 +431,14 @@ export default function StoreDetailPage() {
                           )}
                           {item.status !== 'pemilik' && (
                             <button
-                              onClick={() => handleUpdateAnggotaStatus(item.id, 'pemilik')}
+                              onClick={() => handleUpdateAnggotaStatus(item.user_id, 'pemilik')}
                               className="w-full text-left px-4 py-2 text-xs sm:text-sm text-amber-800 hover:bg-amber-50 flex items-center gap-2 transition-colors font-medium"
                             >
                               <i className="fa-solid fa-user-shield w-4"></i> Ubah Jadi Pemilik
                             </button>
                           )}
                           <button
-                            onClick={() => handleUpdateAnggotaStatus(item.id, 'kick')}
+                            onClick={() => handleUpdateAnggotaStatus(item.user_id, 'kick')}
                             className="w-full text-left px-4 py-2 text-xs sm:text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors font-medium"
                           >
                             <i className="fa-solid fa-user-slash w-4"></i> Keluarkan

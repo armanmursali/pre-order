@@ -1,3 +1,4 @@
+// app/(dashboard)/store/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -16,6 +17,7 @@ interface Toko {
   nama: string;
   deskripsi?: string | null;
   foto: string | null;
+  anggota?: any[]; // [BARU]: Menyimpan daftar anggota langsung di tabel toko
   kategori_toko?: {
     nama: string;
   };
@@ -64,6 +66,7 @@ export default function StorePage() {
     }, 3000);
   };
   
+  // [LOGIKA UTAMA]: Mengambil semua toko dan mengecek status keanggotaan user dari kolom JSONB 'anggota'
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -81,24 +84,6 @@ export default function StorePage() {
         setKategoris(dataKategori);
       }
 
-      const { data: joinedStores } = await supabase
-        .from('user_toko')
-        .select('toko_id, status')
-        .eq('user_id', session.user.id);
-
-      const approvedStoreIds = joinedStores 
-        ? joinedStores.filter(item => item.status === 'tergabung').map(item => item.toko_id) 
-        : [];
-
-      const pendingStoreIds = joinedStores 
-        ? joinedStores.filter(item => item.status === 'pending').map(item => item.toko_id) 
-        : [];
-
-      const allAccessibleIds = [
-        ...approvedStoreIds,
-        ...pendingStoreIds
-      ];
-
       let { data: dataToko, error: errorToko } = await supabase
         .from('toko')
         .select('*, kategori_toko(nama)')
@@ -107,18 +92,28 @@ export default function StorePage() {
       if (errorToko) {
         console.error('Gagal memuat toko:', errorToko.message);
       } else if (dataToko) {
+        const userId = session.user.id;
+
         const mappedTokos = dataToko
-          .filter(toko => toko.user_id === session.user.id || allAccessibleIds.includes(toko.id))
-          .map(toko => {
-            let status = 'tergabung';
-            if (toko.user_id === session.user.id) {
+          .map((toko: any) => {
+            const listAnggota = Array.isArray(toko.anggota) ? toko.anggota : [];
+            const isPrimaryOwner = toko.user_id === userId;
+            const foundMember = listAnggota.find((m: any) => m.user_id === userId);
+
+            let status = 'pending';
+            if (isPrimaryOwner || foundMember?.status === 'pemilik') {
               status = 'pemilik';
-            } else {
-              const foundJoin = joinedStores?.find(j => j.toko_id === toko.id);
-              status = foundJoin ? foundJoin.status : 'pending';
+            } else if (foundMember?.status === 'tergabung') {
+              status = 'tergabung';
+            } else if (foundMember?.status === 'pending') {
+              status = 'pending';
+            } else if (!isPrimaryOwner && !foundMember) {
+              return null; // Toko yang sama sekali tidak berelasi dengan user tidak ditampilkan
             }
-            return { ...toko, status_keanggotaan: status };
-          });
+
+            return { ...toko, status_keanggotaan: status, anggota: listAnggota };
+          })
+          .filter(Boolean);
 
         setTokos(mappedTokos);
       }
@@ -183,6 +178,7 @@ export default function StorePage() {
     setDeleteInputName('');
   };
 
+  // [LOGIKA GABUNG TOKO]: Menambahkan data user ke dalam array JSONB kolom 'anggota' di tabel 'toko'
   const handleJoinStore = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanStoreId = joinStoreId.trim();
@@ -198,7 +194,7 @@ export default function StorePage() {
 
       const { data: targetToko, error: findError } = await supabase
         .from('toko')
-        .select('id, nama, user_id')
+        .select('id, nama, user_id, anggota')
         .eq('id', cleanStoreId)
         .maybeSingle();
 
@@ -210,20 +206,35 @@ export default function StorePage() {
         throw new Error('Anda adalah pemilik utama toko ini.');
       }
 
-      const { error: insertError } = await supabase
-        .from('user_toko')
-        .insert({
-          user_id: session.user.id,
-          toko_id: targetToko.id,
-          status: 'pending'
-        });
-
-      if (insertError) {
-        if (insertError.code === '23505') {
-          throw new Error('Anda sudah mengajukan permintaan atau tergabung di toko ini.');
-        }
-        throw insertError;
+      const currentAnggota = Array.isArray(targetToko.anggota) ? targetToko.anggota : [];
+      const alreadyExists = currentAnggota.some((m: any) => m.user_id === session.user.id);
+      
+      if (alreadyExists) {
+        throw new Error('Anda sudah mengajukan permintaan atau tergabung di toko ini.');
       }
+
+      // Ambil profil ringkas user dari tabel public.users
+      const { data: userData } = await supabase
+        .from('users')
+        .select('nama, email')
+        .eq('id', session.user.id)
+        .maybeSingle();
+
+      const newMember = {
+        user_id: session.user.id,
+        nama: userData?.nama || session.user.user_metadata?.name || 'Pengguna',
+        email: userData?.email || session.user.email || '',
+        status: 'pending'
+      };
+
+      const updatedAnggota = [...currentAnggota, newMember];
+
+      const { error: updateError } = await supabase
+        .from('toko')
+        .update({ anggota: updatedAnggota })
+        .eq('id', targetToko.id);
+
+      if (updateError) throw updateError;
 
       showToast(`Permintaan gabung ke toko "${targetToko.nama}" dikirim (Status: Pending)!`, 'success');
       setIsJoinModalOpen(false);
@@ -293,6 +304,7 @@ export default function StorePage() {
             nama: formData.nama,
             deskripsi: formData.deskripsi,
             foto: fotoUrl,
+            anggota: []
           });
 
         if (error) throw error;
@@ -382,7 +394,7 @@ export default function StorePage() {
             return (
               <div key={toko.id} className="relative bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-orange-200 transition-all group flex flex-col overflow-hidden">
                 
-           
+                {/* Badge Status: 'toko/store saya' untuk pemilik, atau status lainnya */}
                 <div className="absolute top-3 left-3 z-10">
                   <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm ${
                     toko.status_keanggotaan === 'pemilik' 
