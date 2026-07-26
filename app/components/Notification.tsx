@@ -4,7 +4,6 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
-// [PERBAIKAN PRESISI]: Mengimpor helper aksi notifikasi untuk menangani navigasi dinamis secara aman
 import { handleNotificationClick } from '@/utils/notificationActionHelper';
 
 interface NotificationProps {
@@ -27,6 +26,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
   const [notifs, setNotifs] = useState<NotifItem[]>([]);
   const [flashToast, setFlashToast] = useState<string | null>(null);
 
+  // [REALTIME & DATA SYNC]: Mendengarkan perubahan data INSERT, UPDATE, dan DELETE pada tabel notifikasi secara real-time
   useEffect(() => {
     let channel: any;
 
@@ -36,12 +36,10 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
 
       const userId = session.user.id;
 
-      // Mengambil data notifikasi awal
       fetchNotifData(userId);
 
-      // [LOGIKA REALTIME]: Mendengarkan perubahan data tabel notifikasi secara langsung
       channel = supabase
-        .channel('realtime-notifikasi-panel')
+        .channel('realtime-notifikasi-panel-sync')
         .on(
           'postgres_changes',
           {
@@ -54,10 +52,40 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
             const newNotif = payload.new as NotifItem;
             setNotifs((prev) => [newNotif, ...prev]);
             
+            // Tampilkan Flash Toast di bagian atas saat ada notifikasi baru masuk
             setFlashToast(newNotif.message);
             setTimeout(() => {
               setFlashToast(null);
             }, 4000);
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'notifikasi',
+            filter: `user_id=eq.${userId}`,
+          },
+          (payload) => {
+            // Sinkronisasi state lokal secara real-time saat ada notifikasi yang dihapus
+            const deletedId = payload.old.id;
+            setNotifs((prev) => prev.filter((n) => n.id !== deletedId));
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'notifikasi',
+            filter: `user_id=eq.${userId}`,
+          },
+          (payload) => {
+            const updatedNotif = payload.new as NotifItem;
+            setNotifs((prev) =>
+              prev.map((n) => (n.id === updatedNotif.id ? updatedNotif : n))
+            );
           }
         )
         .subscribe();
@@ -72,6 +100,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
     };
   }, []);
 
+  // [FUNGSI AMBIL DATA]: Mengambil data awal notifikasi dari database
   const fetchNotifData = async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -88,6 +117,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
     }
   };
 
+  // [FUNGSI TANDAI DIBACA]: Mengubah status is_read menjadi true pada database
   const markAsRead = async (id: string) => {
     try {
       const { error } = await supabase
@@ -105,6 +135,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
     }
   };
 
+  // [FUNGSI TANDAI SEMUA DIBACA]: Mengubah seluruh status notifikasi aktif menjadi dibaca
   const markAllAsRead = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -123,6 +154,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
     }
   };
 
+  // [FUNGSI HAPUS NOTIFIKASI]: Menghapus satu notifikasi secara permanen dari database
   const deleteNotif = async (id: string) => {
     try {
       const { error } = await supabase
@@ -138,6 +170,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
     }
   };
 
+  // [FUNGSI HAPUS SEMUA]: Menghapus seluruh riwayat notifikasi pengguna
   const deleteAllNotifs = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -156,13 +189,14 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
     }
   };
 
-  // [PERBAIKAN FUNGSI KLIK]: Menandai dibaca, menutup panel, lalu meneruskan objek notifikasi ke helper navigasi
+  // [FUNGSI KLIK ITEM]: Menangani aksi navigasi dan penandaan dibaca
   const handleItemClick = async (notif: NotifItem) => {
     await markAsRead(notif.id);
     onClose();
     handleNotificationClick(notif, router);
   };
 
+  // [FORMAT WAKTU]: Format tanggal dan jam ramah pengguna
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' - ' + date.toLocaleDateString();
@@ -239,7 +273,6 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
                 <p className="text-xs sm:text-sm leading-relaxed mb-3">{notif.message}</p>
 
                 <div className="flex items-center justify-between pt-2 border-t border-gray-200/60 text-xs">
-                  {/* Tombol Lihat Toko yang memanggil fungsi handleItemClick */}
                   <button
                     onClick={() => handleItemClick(notif)}
                     className="text-amber-800 hover:text-amber-900 font-bold transition-colors flex items-center gap-1 cursor-pointer"
@@ -270,9 +303,9 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
         </div>
       </div>
 
-      {/* Flash Toast Real-Time */}
+      {/* [PERBAIKAN POSISI TOAST]: Flash Toast diposisikan di atas layar (top-6 right-6) */}
       {flashToast && (
-        <div className="fixed bottom-6 right-6 z-[200] animate-bounce">
+        <div className="fixed top-6 right-6 z-[200] animate-bounce">
           <div className="flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl bg-amber-800 text-white font-medium border border-amber-700">
             <i className="fa-solid fa-bell text-xl text-yellow-300 animate-pulse"></i>
             <div>
