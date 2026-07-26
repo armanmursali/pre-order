@@ -1,15 +1,14 @@
+// app/(dashboard)/store/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
 
-
 interface Kategori {
   id: string;
   nama: string;
 }
-
 
 interface Toko {
   id: string;
@@ -26,30 +25,24 @@ interface Toko {
 export default function StorePage() {
   const supabase = createClient();
   
-
   const [tokos, setTokos] = useState<Toko[]>([]);
   const [kategoris, setKategoris] = useState<Kategori[]>([]);
   
-
   const [loading, setLoading] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   
-
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editId, setEditId] = useState<string | null>(null);
 
-
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
   const [tokoToDelete, setTokoToDelete] = useState<Toko | null>(null);
   const [deleteInputName, setDeleteInputName] = useState<string>('');
   
-
+  // [PERBAIKAN]: Memastikan state modal Gabung Toko terdefinisi dan aktif
   const [isJoinModalOpen, setIsJoinModalOpen] = useState<boolean>(false);
   const [joinStoreId, setJoinStoreId] = useState<string>('');
-
 
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -61,7 +54,6 @@ export default function StorePage() {
     previewFoto: '' as string,
   });
 
-
   useEffect(() => {
     fetchData();
   }, []);
@@ -72,7 +64,6 @@ export default function StorePage() {
       setToast(null);
     }, 3000);
   };
-
   
   const fetchData = async () => {
     setLoading(true);
@@ -80,7 +71,6 @@ export default function StorePage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) return;
 
-    
       const { data: dataKategori, error: errorKategori } = await supabase
         .from('kategori_toko')
         .select('*')
@@ -92,7 +82,6 @@ export default function StorePage() {
         setKategoris(dataKategori);
       }
 
-     
       const { data: joinedStores } = await supabase
         .from('user_toko')
         .select('toko_id')
@@ -100,7 +89,6 @@ export default function StorePage() {
 
       const joinedStoreIds = joinedStores ? joinedStores.map((item) => item.toko_id) : [];
 
-    
       let query = supabase
         .from('toko')
         .select('*, kategori_toko(nama)');
@@ -125,13 +113,11 @@ export default function StorePage() {
     }
   };
 
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
- 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -143,7 +129,6 @@ export default function StorePage() {
     }
   };
 
-  
   const closeModal = () => {
     setIsModalOpen(false);
     setEditId(null);
@@ -156,7 +141,6 @@ export default function StorePage() {
     });
   };
 
-  
   const openEditModal = (toko: Toko) => {
     setEditId(toko.id);
     setFormData({
@@ -170,7 +154,6 @@ export default function StorePage() {
     setActiveDropdown(null); 
   };
 
- 
   const openDeleteModal = (toko: Toko) => {
     setTokoToDelete(toko);
     setDeleteInputName(''); 
@@ -178,14 +161,13 @@ export default function StorePage() {
     setActiveDropdown(null); 
   };
 
-  
   const closeDeleteModal = () => {
     setIsDeleteModalOpen(false);
     setTokoToDelete(null);
     setDeleteInputName('');
   };
 
-  
+  // [PERBAIKAN]: Fungsi untuk menangani proses gabung toko berdasarkan ID Toko
   const handleJoinStore = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!joinStoreId.trim()) {
@@ -198,7 +180,6 @@ export default function StorePage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) throw new Error('Anda harus login terlebih dahulu.');
 
-     
       const { data: targetToko, error: findError } = await supabase
         .from('toko')
         .select('id, nama, user_id')
@@ -209,12 +190,10 @@ export default function StorePage() {
         throw new Error('Toko dengan ID tersebut tidak ditemukan.');
       }
 
-      
       if (targetToko.user_id === session.user.id) {
         throw new Error('Anda adalah pemilik utama toko ini.');
       }
 
-     
       const { error: insertError } = await supabase
         .from('user_toko')
         .insert({
@@ -240,7 +219,6 @@ export default function StorePage() {
     }
   };
 
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -257,7 +235,6 @@ export default function StorePage() {
 
       let fotoUrl = formData.previewFoto;
 
-     
       if (formData.fileFoto) {
         const fileExt = formData.fileFoto.name.split('.').pop();
         const fileName = `${session.user.id}-${Date.now()}.${fileExt}`;
@@ -275,7 +252,6 @@ export default function StorePage() {
 
         fotoUrl = publicUrlData.publicUrl;
       }
-
 
       if (editId) {
         const { error } = await supabase
@@ -315,7 +291,6 @@ export default function StorePage() {
     }
   };
 
- 
   const executeDelete = async () => {
     if (!tokoToDelete) return;
 
@@ -341,7 +316,6 @@ export default function StorePage() {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative">
       
-     
       {activeDropdown && (
         <div 
           className="fixed inset-0 z-[5]" 
@@ -349,13 +323,13 @@ export default function StorePage() {
         />
       )}
 
+      {/* [PERBAIKAN]: Menyertakan tombol Gabung Toko dan Tambah Toko secara berdampingan */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-amber-900">Manajemen Toko (Store)</h1>
           <p className="text-sm text-gray-500 mt-1">Kelola data toko dan kategori Anda di sini.</p>
         </div>
         <div className="flex items-center gap-3">
-          {/* [PENAMBAHAN]: Tombol Gabung Toko */}
           <button
             onClick={() => setIsJoinModalOpen(true)}
             className="flex items-center gap-2 bg-amber-800 hover:bg-amber-900 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm"
@@ -374,7 +348,6 @@ export default function StorePage() {
         </div>
       </div>
 
-      
       {loading ? (
         <div className="text-center py-12 text-gray-500">
           <i className="fa-solid fa-circle-notch fa-spin text-3xl mb-3 block text-orange-600"></i>
@@ -462,7 +435,6 @@ export default function StorePage() {
         </div>
       )}
 
-     
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
@@ -566,7 +538,7 @@ export default function StorePage() {
         </div>
       )}
 
-    
+      {/* [PERBAIKAN]: Modal Form Gabung Toko */}
       {isJoinModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col">
@@ -617,7 +589,6 @@ export default function StorePage() {
         </div>
       )}
 
-     
       {isDeleteModalOpen && tokoToDelete && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
@@ -668,7 +639,6 @@ export default function StorePage() {
         </div>
       )}
 
-      
       {toast && (
         <div className="fixed bottom-6 right-6 z-[200] transition-all duration-300 ease-in-out">
           <div className={`flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-xl text-white font-medium ${
