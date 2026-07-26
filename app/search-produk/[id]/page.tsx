@@ -38,8 +38,10 @@ export default function PublicProductDetailPage() {
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // [STATE TRANSAKSI]: Kuantitas, Metode Pembayaran Pilihan, File Bukti Transfer
+  // [STATE TRANSAKSI]: Kuantitas, Alamat, Telepon, Metode Pembayaran Pilihan, File Bukti Transfer
   const [jumlah, setJumlah] = useState<number>(1);
+  const [alamatPembeli, setAlamatPembeli] = useState<string>('');
+  const [teleponPembeli, setTeleponPembeli] = useState<string>('');
   const [metodePilihan, setMetodePilihan] = useState<string>('Tunai');
   const [fileBukti, setFileBukti] = useState<File | null>(null);
   const [previewBukti, setPreviewBukti] = useState<string>('');
@@ -102,10 +104,15 @@ export default function PublicProductDetailPage() {
     }
   };
 
-  // [FUNGSI PROSES PEMESANAN / TRANSAKSI]: Menyimpan data pesanan ke database tabel pesanan
+  // [FUNGSI PROSES PEMESANAN / TRANSAKSI]: Menyimpan data pesanan lengkap dengan alamat, telepon, dan unggahan bukti transfer
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!produk) return;
+
+    if (!alamatPembeli.trim() || !teleponPembeli.trim()) {
+      showToast('Alamat dan Nomor Telepon wajib diisi.', 'error');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -126,7 +133,7 @@ export default function PublicProductDetailPage() {
 
         const { error: uploadError } = await supabase.storage
           .from('bukti-transfer')
-          .upload(filePath, fileBukti);
+          .upload(filePath, fileBukti, { upsert: true });
 
         if (uploadError) throw uploadError;
 
@@ -149,6 +156,8 @@ export default function PublicProductDetailPage() {
           total_harga: totalHarga,
           metode_pilihan: metodePilihan,
           bukti_transfer: buktiUrl,
+          alamat_pembeli: alamatPembeli,
+          telepon_pembeli: teleponPembeli,
           status: 'Belum Diterima',
         });
 
@@ -156,6 +165,8 @@ export default function PublicProductDetailPage() {
 
       showToast('Pesanan berhasil dibuat! Status: Belum Diterima pemilik.', 'success');
       setJumlah(1);
+      setAlamatPembeli('');
+      setTeleponPembeli('');
       setFileBukti(null);
       setPreviewBukti('');
     } catch (error: any) {
@@ -305,6 +316,32 @@ export default function PublicProductDetailPage() {
                 </div>
               </div>
 
+              {/* [FIELD WAJIB]: Nomor Telepon Pembeli */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Nomor Telepon / WhatsApp <span className="text-red-500">*</span></label>
+                <input
+                  type="tel"
+                  value={teleponPembeli}
+                  onChange={(e) => setTeleponPembeli(e.target.value)}
+                  placeholder="Contoh: 081234567890"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm bg-white text-gray-900 outline-none focus:ring-2 focus:ring-orange-500"
+                  required
+                />
+              </div>
+
+              {/* [FIELD WAJIB]: Alamat Lengkap Pembeli */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Alamat Lengkap Pengiriman <span className="text-red-500">*</span></label>
+                <textarea
+                  value={alamatPembeli}
+                  onChange={(e) => setAlamatPembeli(e.target.value)}
+                  placeholder="Masukkan alamat lengkap tujuan pengiriman..."
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm bg-white text-gray-900 outline-none focus:ring-2 focus:ring-orange-500"
+                  required
+                ></textarea>
+              </div>
+
               {/* Pilihan Jenis Pembayaran */}
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">Pilih Metode Pembayaran</label>
@@ -327,7 +364,7 @@ export default function PublicProductDetailPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">Upload Bukti Transfer</label>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Upload Bukti Transfer <span className="text-red-500">*</span></label>
                     <input
                       type="file"
                       accept="image/*"
