@@ -12,6 +12,10 @@ interface TokoSearchResult {
   nama: string;
   deskripsi?: string | null;
   foto: string | null;
+  kategori_id?: string;
+  kategori_toko?: {
+    nama: string;
+  };
   tipe: 'toko';
 }
 
@@ -21,12 +25,16 @@ interface ProdukSearchResult {
   nama: string;
   harga: number;
   foto: string | null;
-  tipe: 'produk';
+  jenis_produk_id?: string;
+  jenis_produk?: {
+    nama: string;
+  };
   toko?: {
     id: string;
     user_id: string;
     nama: string;
   };
+  tipe: 'produk';
 }
 
 type SearchResultItem = TokoSearchResult | ProdukSearchResult;
@@ -36,11 +44,16 @@ export default function BerandaPage() {
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // State untuk input pencarian dan hasil pencarian di halaman utama
+  // State untuk input pencarian, kategori/jenis filter, dan hasil pencarian
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResultItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+
+  // State untuk fitur produk serupa (side panel / list kecil di samping)
+  const [similarProducts, setSimilarProducts] = useState<ProdukSearchResult[]>([]);
+  const [activeSimilarId, setActiveSimilarId] = useState<string | null>(null);
+  const [isLoadingSimilar, setIsLoadingSimilar] = useState(false);
 
   // Memeriksa sesi pengguna aktif saat halaman dimuat
   useEffect(() => {
@@ -60,7 +73,7 @@ export default function BerandaPage() {
     checkUserSession();
   }, [router]);
 
-  // Fungsi untuk mengeksekusi pencarian toko atau produk berdasarkan kata kunci
+  // [FUNGSI PENCARIAN DIPERLUAS]: Mencari berdasarkan nama toko, produk, jenis produk, atau kategori toko
   const handleSearchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const query = searchQuery.trim();
@@ -68,22 +81,48 @@ export default function BerandaPage() {
 
     setIsSearching(true);
     setHasSearched(true);
+    setActiveSimilarId(null);
+    setSimilarProducts([]);
     const supabase = createClient();
 
     try {
-      // 1. Cari data Toko yang cocok
-      const { data: tokoData } = await supabase
-        .from('toko')
-        .select('id, user_id, nama, deskripsi, foto')
-        .ilike('nama', `%${query}%`)
-        .limit(10);
+      // 1. Cari kategori toko yang cocok dengan query untuk mendapatkan ID-nya
+      const { data: matchedKategori } = await supabase
+        .from('kategori_toko')
+        .select('id')
+        .ilike('nama', `%${query}%`);
+      const kategoriIds = (matchedKategori || []).map((k: any) => k.id);
 
-      // 2. Cari data Produk yang cocok (beserta relasi toko dan user_id pemilik toko)
-      const { data: produkData } = await supabase
+      // 2. Ambil data Toko berdasarkan nama atau kategori_id
+      let tokoQuery = supabase
+        .from('toko')
+        .select('id, user_id, nama, deskripsi, foto, kategori_toko(nama)');
+      
+      if (kategoriIds.length > 0) {
+        tokoQuery = tokoQuery.or(`nama.ilike.%${query}%,kategori_id.in.(${kategoriIds.join(',')})`);
+      } else {
+        tokoQuery = tokoQuery.ilike('nama', `%${query}%`);
+      }
+      const { data: tokoData } = await tokoQuery.limit(10);
+
+      // 3. Cari jenis produk yang cocok dengan query untuk mendapatkan ID-nya
+      const { data: matchedJenis } = await supabase
+        .from('jenis_produk')
+        .select('id')
+        .ilike('nama', `%${query}%`);
+      const jenisIds = (matchedJenis || []).map((j: any) => j.id);
+
+      // 4. Ambil data Produk berdasarkan nama atau jenis_produk_id
+      let produkQuery = supabase
         .from('produk')
-        .select('id, toko_id, nama, harga, foto, toko:toko_id(id, user_id, nama)')
-        .ilike('nama', `%${query}%`)
-        .limit(10);
+        .select('id, toko_id, nama, harga, foto, jenis_produk(nama), toko:toko_id(id, user_id, nama)');
+
+      if (jenisIds.length > 0) {
+        produkQuery = produkQuery.or(`nama.ilike.%${query}%,jenis_produk_id.in.(${jenisIds.join(',')})`);
+      } else {
+        produkQuery = produkQuery.ilike('nama', `%${query}%`);
+      }
+      const { data: produkData } = await produkQuery.limit(10);
 
       const formattedTokos: TokoSearchResult[] = (tokoData || []).map((t: any) => ({
         ...t,
@@ -103,6 +142,41 @@ export default function BerandaPage() {
     }
   };
 
+  // [FUNGSI PRODUK SERUPA]: Mengambil produk lain yang memiliki jenis_produk_id yang sama
+  const handleFetchSimilarProducts = async (produkId: string, jenisProdukId?: string) => {
+    if (!jenisProdukId) {
+      setSimilarProducts([]);
+      setActiveSimilarId(null);
+      return;
+    }
+
+    if (activeSimilarId === produkId) {
+      // Toggle tutup jika diklik kembali
+      setActiveSimilarId(null);
+      setSimilarProducts([]);
+      return;
+    }
+
+    setActiveSimilarId(produkId);
+    setIsLoadingSimilar(true);
+    const supabase = createClient();
+
+    try {
+      const { data } = await supabase
+        .from('produk')
+        .select('id, toko_id, nama, harga, foto, jenis_produk(nama), toko:toko_id(id, user_id, nama)')
+        .eq('jenis_produk_id', jenisProdukId)
+        .neq('id', produkId) // Kecualikan produk utama
+        .limit(5);
+
+      setSimilarProducts((data || []).map((p: any) => ({ ...p, tipe: 'produk' as const })));
+    } catch (err) {
+      console.error('Gagal memuat produk serupa:', err);
+    } finally {
+      setIsLoadingSimilar(false);
+    }
+  };
+
   const formatRupiah = (angka: number) => {
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',
@@ -113,21 +187,21 @@ export default function BerandaPage() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center">
+      <div className="flex h-full items-center justify-center bg-white text-gray-800">
         <p className="text-gray-500">Memuat data sesi...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 bg-white text-gray-900 min-h-screen p-0.5 sm:p-6">
       {/* Kartu Pencarian Utama */}
       <div className="rounded-xl bg-white p-6 shadow-sm border border-gray-200">
         <h1 className="text-xl sm:text-2xl font-bold text-amber-900 mb-2">
           Pencarian Toko & Produk
         </h1>
         <p className="text-xs sm:text-sm text-gray-500 mb-6">
-          Temukan toko atau produk yang Anda inginkan dengan cepat di sini.
+          Cari berdasarkan nama toko, produk, kategori toko, atau jenis produk.
         </p>
 
         {/* Form Input Pencarian dan Tombol Search */}
@@ -138,7 +212,7 @@ export default function BerandaPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Ketik nama toko atau produk..."
+              placeholder="Ketik nama toko, produk, jenis, atau kategori..."
               className="w-full pl-11 pr-4 py-2.5 sm:py-3 bg-gray-50 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-xs sm:text-sm text-gray-900 transition-all shadow-sm"
               required
             />
@@ -163,7 +237,7 @@ export default function BerandaPage() {
         </form>
       </div>
 
-      {/* Bagian Menampilkan Hasil Pencarian Langsung di Halaman Ini */}
+      {/* Bagian Menampilkan Hasil Pencarian */}
       {hasSearched && (
         <div className="space-y-4">
           <h2 className="text-lg font-bold text-gray-800 px-1">
@@ -181,82 +255,157 @@ export default function BerandaPage() {
               <p className="text-xs sm:text-sm">Tidak ada toko atau produk yang ditemukan.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {searchResults.map((item) => {
-                if (item.tipe === 'toko') {
-                  // [LOGIKA NAVIGASI TOKO]: Jika bukan milik sendiri, arahkan ke /search/[id], jika milik sendiri ke /store/[id]
-                  const isMyStore = item.user_id === currentUserId;
-                  const targetHref = isMyStore ? `/store/${item.id}` : `/search/${item.id}`;
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Kolom Kiri: Hasil Utama Pencarian (2 Kolom span pada layar besar) */}
+              <div className="lg:col-span-2 space-y-4">
+                {searchResults.map((item) => {
+                  if (item.tipe === 'toko') {
+                    const isMyStore = item.user_id === currentUserId;
+                    const targetHref = isMyStore ? `/store/${item.id}` : `/search/${item.id}`;
 
-                  return (
-                    <Link
-                      key={`toko-${item.id}`}
-                      href={targetHref}
-                      className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-orange-200 transition-all p-4 flex items-center gap-4 group"
-                    >
-                      <div className="w-16 h-16 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center border border-gray-200">
-                        {item.foto ? (
-                          <img src={item.foto} alt={item.nama} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                        ) : (
-                          <i className="fa-solid fa-store text-xl text-gray-400"></i>
-                        )}
-                      </div>
-                      <div className="flex flex-col truncate">
-                        <span className="w-fit bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider mb-1">
-                          Toko {isMyStore ? '(Milik Saya)' : ''}
-                        </span>
-                        <h3 className="text-sm sm:text-base font-bold text-amber-900 group-hover:text-orange-700 transition-colors truncate">
-                          {item.nama}
-                        </h3>
-                        <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">
-                          {item.deskripsi || 'Tidak ada deskripsi.'}
-                        </p>
-                      </div>
-                    </Link>
-                  );
-                } else {
-                  // [LOGIKA NAVIGASI PRODUK]: Cek pemilik toko dari relasi produk
-                  const storeOwnerId = item.toko?.user_id;
-                  const isMyStore = storeOwnerId === currentUserId;
-                  const targetHref = isMyStore ? `/store/${item.toko_id}` : `/search/${item.toko_id}`;
-
-                  return (
-                    <Link
-                      key={`produk-${item.id}`}
-                      href={targetHref}
-                      className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-orange-200 transition-all p-4 flex items-center gap-4 group"
-                    >
-                      <div className="w-16 h-16 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center border border-gray-200">
-                        {item.foto ? (
-                          <img src={item.foto} alt={item.nama} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                        ) : (
-                          <i className="fa-solid fa-box text-xl text-gray-400"></i>
-                        )}
-                      </div>
-                      <div className="flex flex-col truncate flex-grow">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider">
-                            Produk
-                          </span>
-                          <span className="text-[10px] text-gray-400 truncate">di {item.toko?.nama || 'Toko'}</span>
+                    return (
+                      <Link
+                        key={`toko-${item.id}`}
+                        href={targetHref}
+                        className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-orange-200 transition-all p-4 flex items-center gap-4 group block"
+                      >
+                        <div className="w-16 h-16 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center border border-gray-200">
+                          {item.foto ? (
+                            <img src={item.foto} alt={item.nama} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          ) : (
+                            <i className="fa-solid fa-store text-xl text-gray-400"></i>
+                          )}
                         </div>
-                        <h3 className="text-sm sm:text-base font-bold text-gray-900 group-hover:text-orange-700 transition-colors truncate">
-                          {item.nama}
-                        </h3>
-                        <span className="text-xs sm:text-sm font-semibold text-amber-900 mt-0.5">
-                          {formatRupiah(item.harga)}
-                        </span>
+                        <div className="flex flex-col truncate flex-grow">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider">
+                              Toko {isMyStore ? '(Milik Saya)' : ''}
+                            </span>
+                            {item.kategori_toko?.nama && (
+                              <span className="text-[10px] text-gray-500 font-medium">Kategori: {item.kategori_toko.nama}</span>
+                            )}
+                          </div>
+                          <h3 className="text-sm sm:text-base font-bold text-amber-900 group-hover:text-orange-700 transition-colors truncate">
+                            {item.nama}
+                          </h3>
+                          <p className="text-xs text-gray-500 line-clamp-1 mt-0.5">
+                            {item.deskripsi || 'Tidak ada deskripsi.'}
+                          </p>
+                        </div>
+                      </Link>
+                    );
+                  } else {
+                    const storeOwnerId = item.toko?.user_id;
+                    const isMyStore = storeOwnerId === currentUserId;
+                    // [NAVIGASI PRODUK]: Jika bukan produk sendiri, menuju ke /search/produk/[id]
+                    const targetHref = isMyStore ? `/store/${item.toko_id}` : `/search/produk/${item.id}`;
+
+                    return (
+                      <div key={`produk-${item.id}`} className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-orange-200 transition-all p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 group">
+                        <Link href={targetHref} className="flex items-center gap-4 flex-grow truncate">
+                          <div className="w-16 h-16 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center border border-gray-200">
+                            {item.foto ? (
+                              <img src={item.foto} alt={item.nama} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                            ) : (
+                              <i className="fa-solid fa-box text-xl text-gray-400"></i>
+                            )}
+                          </div>
+                          <div className="flex flex-col truncate">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider">
+                                Produk
+                              </span>
+                              {item.jenis_produk?.nama && (
+                                <span className="text-[10px] text-gray-500 font-medium">Jenis: {item.jenis_produk.nama}</span>
+                              )}
+                              <span className="text-[10px] text-gray-400 truncate">di {item.toko?.nama || 'Toko'}</span>
+                            </div>
+                            <h3 className="text-sm sm:text-base font-bold text-gray-900 group-hover:text-orange-700 transition-colors truncate">
+                              {item.nama}
+                            </h3>
+                            <span className="text-xs sm:text-sm font-semibold text-amber-900 mt-0.5">
+                              {formatRupiah(item.harga)}
+                            </span>
+                          </div>
+                        </Link>
+
+                        {/* [TOMBOL PRODUK SERUPA]: Tombol untuk menampilkan produk serupa di samping */}
+                        <button
+                          type="button"
+                          onClick={() => handleFetchSimilarProducts(item.id, item.jenis_produk_id)}
+                          className="w-full sm:w-auto px-3 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-700 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 flex-shrink-0"
+                        >
+                          <i className="fa-solid fa-layer-group"></i>
+                          <span>{activeSimilarId === item.id ? 'Tutup Serupa' : 'Produk Serupa'}</span>
+                        </button>
                       </div>
-                    </Link>
-                  );
-                }
-              })}
+                    );
+                  }
+                })}
+              </div>
+
+              {/* [KOLOM KANAN]: Bagian Samping Berjejer Produk Serupa Berukuran Lebih Kecil */}
+              <div className="space-y-4">
+                <div className="bg-gray-50 rounded-xl p-4 border border-gray-200 sticky top-4">
+                  <h3 className="font-bold text-amber-900 text-sm sm:text-base mb-3 flex items-center gap-2">
+                    <i className="fa-solid fa-boxes-stacked text-orange-600"></i>
+                    <span>Produk Serupa</span>
+                  </h3>
+
+                  {!activeSimilarId ? (
+                    <p className="text-xs text-gray-500 italic py-6 text-center">
+                      Klik tombol <span className="font-semibold text-gray-700">"Produk Serupa"</span> pada salah satu produk di sebelah kiri untuk melihat daftar produk sejenis.
+                    </p>
+                  ) : isLoadingSimilar ? (
+                    <div className="text-center py-8 text-gray-500 text-xs">
+                      <i className="fa-solid fa-circle-notch fa-spin text-xl text-orange-600 mb-2 block"></i>
+                      Memuat produk serupa...
+                    </div>
+                  ) : similarProducts.length === 0 ? (
+                    <p className="text-xs text-gray-500 italic py-6 text-center">
+                      Tidak ada produk serupa ditemukan.
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {similarProducts.map((sim) => {
+                        const storeOwnerId = sim.toko?.user_id;
+                        const isMyStore = storeOwnerId === currentUserId;
+                        const simTargetHref = isMyStore ? `/store/${sim.toko_id}` : `/search/produk/${sim.id}`;
+
+                        return (
+                          <Link
+                            key={`similar-${sim.id}`}
+                            href={simTargetHref}
+                            className="bg-white border border-gray-200 rounded-lg p-2.5 shadow-sm hover:border-orange-300 transition-all flex items-center gap-3 group block"
+                          >
+                            {/* Ukuran foto lebih kecil */}
+                            <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 flex items-center justify-center border border-gray-200">
+                              {sim.foto ? (
+                                <img src={sim.foto} alt={sim.nama} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                              ) : (
+                                <i className="fa-solid fa-box text-sm text-gray-400"></i>
+                              )}
+                            </div>
+                            <div className="flex flex-col truncate flex-grow">
+                              <h4 className="font-bold text-gray-900 text-xs group-hover:text-orange-700 transition-colors truncate">
+                                {sim.nama}
+                              </h4>
+                              <span className="text-[10px] text-gray-400 truncate mt-0.5">di {sim.toko?.nama || 'Toko'}</span>
+                              <span className="text-xs font-semibold text-amber-900 mt-0.5">
+                                {formatRupiah(sim.harga)}
+                              </span>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>
       )}
-
-    
     </div>
   );
 }
