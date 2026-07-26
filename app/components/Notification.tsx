@@ -250,11 +250,11 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
         </div>
       </div>
 
-      {/* Flash Toast Real-Time */}
+      {/* Flash Toast Real-Time (Perbaikan penulisan kelas ikon fa-bell) */}
       {flashToast && (
         <div className="fixed bottom-6 right-6 z-[200] animate-bounce">
           <div className="flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl bg-amber-800 text-white font-medium border border-amber-700">
-            <i className="fa-solid bell text-xl text-yellow-300 animate-pulse"></i>
+            <i className="fa-solid fa-bell text-xl text-yellow-300 animate-pulse"></i>
             <div>
               <p className="text-xs font-bold text-yellow-200">Notifikasi Baru!</p>
               <p className="text-xs tracking-wide">{flashToast}</p>

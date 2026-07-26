@@ -56,12 +56,25 @@ export default function DashboardLayout({
 
         fetchUnread();
 
+        // [REALTIME DUA ARAH]: Mendengarkan seluruh perubahan INSERT pada tabel notifikasi untuk user aktif
         channel = supabase
-          .channel('layout-notif-badge-counter')
+          .channel(`layout-notif-realtime-${userId}`)
           .on(
             'postgres_changes',
             {
-              event: '*',
+              event: 'INSERT',
+              schema: 'public',
+              table: 'notifikasi',
+              filter: `user_id=eq.${userId}`,
+            },
+            () => {
+              fetchUnread();
+            }
+          )
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
               schema: 'public',
               table: 'notifikasi',
               filter: `user_id=eq.${userId}`,
