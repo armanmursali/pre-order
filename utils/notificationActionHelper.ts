@@ -3,8 +3,7 @@ import { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.share
 
 /**
  * [HELPER AKSI NOTIFIKASI DINAMIS]: Mengatur arah navigasi dan tindakan saat notifikasi diklik.
- * Dirancang secara modular dan dinamis untuk mendukung berbagai menu masa depan (seperti store, orders, dll)
- * berdasarkan penanda token atau kata kunci di dalam pesan, tanpa mengubah logika dasar yang ada.
+ * Mengekstrak ID Toko dari pesan agar langsung membuka halaman /store/[id] secara presisi.
  */
 export function handleNotificationClick(
   notif: { id: string; title: string; message: string }, 
@@ -13,33 +12,38 @@ export function handleNotificationClick(
   const titleLower = notif.title.toLowerCase();
   const message = notif.message;
 
-  // [DINAMIS - MODUL ORDERS]: Cek jika notifikasi berkaitan dengan pesanan/orders di masa depan
+  // [DINAMIS - MODUL ORDERS]: Penanganan untuk modul orders di masa depan
   if (titleLower.includes('pesanan') || titleLower.includes('order') || message.includes('[ORDER_ID:')) {
     const orderIdMatch = message.match(/\[ORDER_ID:(.*?)\]/);
     if (orderIdMatch && orderIdMatch[1]) {
-      const orderId = orderIdMatch[1];
-      router.push(`/orders/${orderId}`);
+      router.push(`/orders/${orderIdMatch[1]}`);
       return;
     }
     router.push('/orders');
     return;
   }
 
-  // [DINAMIS - MODUL TOKO / STORE]: Menangani navigasi terkait toko dan permintaan gabung
+  // [DINAMIS - MODUL STORE / TOKO]: Langsung terlempar ke parameter ID toko
   if (titleLower.includes('toko') || message.includes('meminta untuk bergabung') || message.includes('[STORE_ID:')) {
-    // Ekstraksi ID Toko secara presisi dari pola [STORE_ID:...] di dalam string pesan
+    // 1. Cek jika pesan memiliki pola penanda [STORE_ID:...]
     const storeIdMatch = message.match(/\[STORE_ID:(.*?)\]/);
-    
     if (storeIdMatch && storeIdMatch[1]) {
-      const storeId = storeIdMatch[1];
-      router.push(`/store/${storeId}`);
+      router.push(`/store/${storeIdMatch[1]}`);
       return;
     }
-    
+
+    // 2. Jika tidak ada penanda khusus, coba cari pola UUID standar di dalam teks pesan
+    const uuidMatch = message.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+    if (uuidMatch && uuidMatch[0]) {
+      router.push(`/store/${uuidMatch[0]}`);
+      return;
+    }
+
+    // 3. Fallback jika ID tidak ditemukan sama sekali di dalam pesan
     router.push('/store');
     return;
   }
 
-  // [FALLBACK AMAN]: Pengarah default jika pola tidak dikenali
+  // [FALLBACK DEFAULT AMAN]
   router.push('/store');
 }

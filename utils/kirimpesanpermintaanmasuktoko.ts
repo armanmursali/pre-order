@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/client';
 /**
  * [HELPER TERPISAH]: Mengirim pesan pemberitahuan permintaan masuk toko ke pemilik toko.
  * Menyisipkan ID toko ke dalam pesan agar dapat diekstrak untuk navigasi langsung ke parameter ID toko.
+ * Menangani parameter opsional atau nilai null secara aman agar terhindar dari runtime error.
  */
 export async function kirimpesanpermintaanmasuktoko(
   ownerId: string | null | undefined, 
