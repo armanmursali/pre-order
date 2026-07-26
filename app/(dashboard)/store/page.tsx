@@ -4,7 +4,6 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
-// [BARU]: Mengimpor helper notifikasi untuk mengirim pemberitahuan ke pemilik toko
 import { sendNotification } from '@/utils/notificationHelper';
 
 interface Kategori {
@@ -179,7 +178,6 @@ export default function StorePage() {
     setDeleteInputName('');
   };
 
-  // [LOGIKA GABUNG TOKO + NOTIFIKASI PEMILIK]: Menambahkan data ke array anggota dan mengirim notifikasi real-time ke pemilik toko
   const handleJoinStore = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanStoreId = joinStoreId.trim();
@@ -214,7 +212,6 @@ export default function StorePage() {
         throw new Error('Anda sudah mengajukan permintaan atau tergabung di toko ini.');
       }
 
-      // Ambil profil ringkas user dari tabel public.users
       const { data: userData } = await supabase
         .from('users')
         .select('nama, email')
@@ -240,7 +237,7 @@ export default function StorePage() {
 
       if (updateError) throw updateError;
 
-      // [BARU]: Kirim notifikasi ke pemilik utama toko (targetToko.user_id)
+      // Kirim notifikasi real-time ke pemilik toko
       await sendNotification(
         targetToko.user_id,
         'Permintaan Gabung Toko',
@@ -405,7 +402,6 @@ export default function StorePage() {
             return (
               <div key={toko.id} className="relative bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-orange-200 transition-all group flex flex-col overflow-hidden">
                 
-                {/* Badge Status: 'toko/store saya' untuk pemilik, atau status lainnya */}
                 <div className="absolute top-3 left-3 z-10">
                   <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm ${
                     toko.status_keanggotaan === 'pemilik' 

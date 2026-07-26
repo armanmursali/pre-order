@@ -2,15 +2,14 @@
 import { createClient } from '@/utils/supabase/client';
 
 /**
- * [HELPER NOTIFIKASI]: Mengirim notifikasi baru ke database secara aman dan andal
+ * [HELPER NOTIFIKASI]: Mengirim notifikasi baru ke database untuk target user tertentu
  */
 export async function sendNotification(userId: string, title: string, message: string) {
   try {
     const supabase = createClient();
     
-    // Validasi parameter wajib
     if (!userId || !title || !message) {
-      console.error('Parameter pengiriman notifikasi tidak lengkap:', { userId, title, message });
+      console.error('Parameter notifikasi tidak lengkap:', { userId, title, message });
       return;
     }
 
@@ -24,11 +23,11 @@ export async function sendNotification(userId: string, title: string, message: s
       });
 
     if (error) {
-      console.error('Gagal menyimpan notifikasi ke Supabase:', error.message);
+      console.error('Gagal menyimpan notifikasi:', error.message);
     } else {
-      console.log('Notifikasi berhasil dikirim ke user:', userId);
+      console.log('Notifikasi berhasil dikirim ke user ID:', userId);
     }
   } catch (err: any) {
-    console.error('Terjadi kesalahan sistem pada helper notifikasi:', err.message);
+    console.error('Terjadi kesalahan pada helper notifikasi:', err.message);
   }
 }

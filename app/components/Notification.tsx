@@ -35,9 +35,9 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
       // Ambil data notifikasi awal
       fetchNotifData(userId);
 
-      // [REALTIME SUPABASE]: Mendengarkan event INSERT tabel notifikasi secara langsung
+      // [REALTIME SUPABASE]: Mendengarkan perubahan data pada tabel notifikasi secara langsung tanpa reload
       channel = supabase
-        .channel('realtime-notifikasi-channel')
+        .channel('realtime-notifikasi-panel')
         .on(
           'postgres_changes',
           {
@@ -50,7 +50,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
             const newNotif = payload.new as NotifItem;
             setNotifs((prev) => [newNotif, ...prev]);
             
-            // Tampilkan flash toast saat ada notifikasi masuk
+            // Tampilkan Flash Toast saat ada notifikasi baru masuk
             setFlashToast(newNotif.message);
             setTimeout(() => {
               setFlashToast(null);
@@ -81,7 +81,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
         setNotifs(data);
       }
     } catch (err: any) {
-      console.error('Gagal memuat data notifikasi:', err.message);
+      console.error('Gagal memuat notifikasi:', err.message);
     }
   };
 
@@ -173,7 +173,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
-        {/* Header Panel */}
+        {/* Header Panel Notifikasi */}
         <div className="flex h-16 items-center justify-between px-6 border-b border-gray-200 bg-gray-50 flex-shrink-0">
           <h2 className="text-lg font-bold text-gray-800">Notifikasi</h2>
           <button 
@@ -202,7 +202,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
           </div>
         )}
 
-        {/* Daftar Isi Notifikasi */}
+        {/* Daftar Isi Notifikasi (Scrollable) */}
         <div className="p-4 overflow-y-auto flex-1 space-y-3">
           {notifs.length === 0 ? (
             <div className="text-center py-16 text-gray-400">
@@ -254,7 +254,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
       {flashToast && (
         <div className="fixed bottom-6 right-6 z-[200] animate-bounce">
           <div className="flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl bg-amber-800 text-white font-medium border border-amber-700">
-            <i className="fa-solid fa-bell text-xl text-yellow-300 animate-pulse"></i>
+            <i className="fa-solid bell text-xl text-yellow-300 animate-pulse"></i>
             <div>
               <p className="text-xs font-bold text-yellow-200">Notifikasi Baru!</p>
               <p className="text-xs tracking-wide">{flashToast}</p>

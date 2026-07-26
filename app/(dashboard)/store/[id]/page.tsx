@@ -5,6 +5,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
+// [BARU]: Mengimpor helper notifikasi untuk mengirim pemberitahuan ke anggota terkait
+import { sendNotification } from '@/utils/notificationHelper';
 
 interface TokoDetail {
   id: string;
@@ -179,6 +181,7 @@ export default function StoreDetailPage() {
     }
   };
 
+  // [LOGIKA MANAJEMEN ANGGOTA + PENGIRIMAN NOTIFIKASI KE USER]: Mengatur status & mengirim notifikasi real-time
   const handleUpdateAnggotaStatus = async (targetUserId: string, newStatus: string) => {
     if (!toko) return;
     try {
@@ -208,6 +211,15 @@ export default function StoreDetailPage() {
           .eq('id', toko.id);
 
         if (error) throw error;
+
+        // [BARU]: Kirim notifikasi jika di-kick oleh pemilik
+        if (newStatus === 'kick') {
+          await sendNotification(
+            targetUserId,
+            'Keluar dari Toko',
+            `Anda telah dikeluarkan dari toko "${toko.nama}".`
+          );
+        }
       } else {
         updatedAnggota = updatedAnggota.map((m: any) => {
           if (m.user_id === targetUserId) {
@@ -222,6 +234,21 @@ export default function StoreDetailPage() {
           .eq('id', toko.id);
 
         if (error) throw error;
+
+        // [BARU]: Kirim notifikasi saat diterima atau dijadikan pemilik
+        if (newStatus === 'tergabung') {
+          await sendNotification(
+            targetUserId,
+            'Bergabung Diterima',
+            `Permintaan Anda untuk bergabung ke toko "${toko.nama}" telah disetujui!`
+          );
+        } else if (newStatus === 'pemilik') {
+          await sendNotification(
+            targetUserId,
+            'Hak Akses Diperbarui',
+            `Anda sekarang telah diangkat menjadi Pemilik di toko "${toko.nama}".`
+          );
+        }
       }
 
       showToast(
@@ -407,7 +434,6 @@ export default function StoreDetailPage() {
     return null;
   }
 
-  // [PERBAIKAN TYPINGS]: Menggunakan array kosong [] sebagai fallback agar bertipe any[] dan mendukung .map()
   const listAnggota = Array.isArray(toko.anggota) ? toko.anggota : [];
 
   return (

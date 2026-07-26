@@ -20,7 +20,7 @@ export default function DashboardLayout({
   const [userName, setUserName] = useState<string>('Administrator');
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState<number>(0); // [BARU]: State jumlah notifikasi belum dibaca
+  const [unreadCount, setUnreadCount] = useState<number>(0);
 
   useEffect(() => {
     const supabase = createClient();
@@ -32,7 +32,6 @@ export default function DashboardLayout({
       if (session?.user) {
         const userId = session.user.id;
 
-        // Ambil nama user
         const { data: userData, error } = await supabase
           .from('users')
           .select('nama')
@@ -43,7 +42,6 @@ export default function DashboardLayout({
           setUserName(userData.nama);
         }
 
-        // Ambil jumlah notifikasi belum dibaca
         const fetchUnread = async () => {
           const { count, error: countErr } = await supabase
             .from('notifikasi')
@@ -58,9 +56,8 @@ export default function DashboardLayout({
 
         fetchUnread();
 
-        // Realtime update untuk badge lonceng
         channel = supabase
-          .channel('layout-notif-badge')
+          .channel('layout-notif-badge-counter')
           .on(
             'postgres_changes',
             {
