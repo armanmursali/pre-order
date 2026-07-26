@@ -8,6 +8,7 @@ import Link from 'next/link';
 
 interface TokoSearchResult {
   id: string;
+  user_id: string;
   nama: string;
   deskripsi?: string | null;
   foto: string | null;
@@ -22,6 +23,8 @@ interface ProdukSearchResult {
   foto: string | null;
   tipe: 'produk';
   toko?: {
+    id: string;
+    user_id: string;
     nama: string;
   };
 }
@@ -31,6 +34,7 @@ type SearchResultItem = TokoSearchResult | ProdukSearchResult;
 export default function BerandaPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // State untuk input pencarian dan hasil pencarian di halaman utama
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,6 +52,7 @@ export default function BerandaPage() {
       if (error || !session) {
         router.push('/login');
       } else {
+        setCurrentUserId(session.user.id);
         setLoading(false);
       }
     }
@@ -69,14 +74,14 @@ export default function BerandaPage() {
       // 1. Cari data Toko yang cocok
       const { data: tokoData } = await supabase
         .from('toko')
-        .select('id, nama, deskripsi, foto')
+        .select('id, user_id, nama, deskripsi, foto')
         .ilike('nama', `%${query}%`)
         .limit(10);
 
-      // 2. Cari data Produk yang cocok (beserta relasi toko)
+      // 2. Cari data Produk yang cocok (beserta relasi toko dan user_id pemilik toko)
       const { data: produkData } = await supabase
         .from('produk')
-        .select('id, toko_id, nama, harga, foto, toko:toko_id(nama)')
+        .select('id, toko_id, nama, harga, foto, toko:toko_id(id, user_id, nama)')
         .ilike('nama', `%${query}%`)
         .limit(10);
 
@@ -179,10 +184,14 @@ export default function BerandaPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {searchResults.map((item) => {
                 if (item.tipe === 'toko') {
+                  // [LOGIKA NAVIGASI TOKO]: Jika bukan milik sendiri, arahkan ke /search/[id], jika milik sendiri ke /store/[id]
+                  const isMyStore = item.user_id === currentUserId;
+                  const targetHref = isMyStore ? `/store/${item.id}` : `/search/${item.id}`;
+
                   return (
                     <Link
                       key={`toko-${item.id}`}
-                      href={`/store/${item.id}`}
+                      href={targetHref}
                       className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-orange-200 transition-all p-4 flex items-center gap-4 group"
                     >
                       <div className="w-16 h-16 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center border border-gray-200">
@@ -194,7 +203,7 @@ export default function BerandaPage() {
                       </div>
                       <div className="flex flex-col truncate">
                         <span className="w-fit bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider mb-1">
-                          Toko
+                          Toko {isMyStore ? '(Milik Saya)' : ''}
                         </span>
                         <h3 className="text-sm sm:text-base font-bold text-amber-900 group-hover:text-orange-700 transition-colors truncate">
                           {item.nama}
@@ -206,10 +215,15 @@ export default function BerandaPage() {
                     </Link>
                   );
                 } else {
+                  // [LOGIKA NAVIGASI PRODUK]: Cek pemilik toko dari relasi produk
+                  const storeOwnerId = item.toko?.user_id;
+                  const isMyStore = storeOwnerId === currentUserId;
+                  const targetHref = isMyStore ? `/store/${item.toko_id}` : `/search/${item.toko_id}`;
+
                   return (
                     <Link
                       key={`produk-${item.id}`}
-                      href={`/store/${item.toko_id}`}
+                      href={targetHref}
                       className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-orange-200 transition-all p-4 flex items-center gap-4 group"
                     >
                       <div className="w-16 h-16 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center border border-gray-200">
@@ -242,21 +256,7 @@ export default function BerandaPage() {
         </div>
       )}
 
-      {/* Grid Informasi / Statistik Singkat */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 pt-4">
-        <div className="rounded-xl bg-white p-6 shadow-sm border border-gray-200">
-          <h3 className="text-sm font-medium text-gray-500">Status Sistem</h3>
-          <p className="mt-2 text-2xl font-semibold text-green-600">Aktif & Aman</p>
-        </div>
-        <div className="rounded-xl bg-white p-6 shadow-sm border border-gray-200">
-          <h3 className="text-sm font-medium text-gray-500">Autentikasi</h3>
-          <p className="mt-2 text-2xl font-semibold text-blue-600">Google OAuth</p>
-        </div>
-        <div className="rounded-xl bg-white p-6 shadow-sm border border-gray-200">
-          <h3 className="text-sm font-medium text-gray-500">Framework</h3>
-          <p className="mt-2 text-2xl font-semibold text-purple-600">Next.js & Supabase</p>
-        </div>
-      </div>
+    
     </div>
   );
 }
