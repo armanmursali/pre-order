@@ -34,8 +34,15 @@ export default function PublicProductDetailPage() {
 
   const [produk, setProduk] = useState<ProdukDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // [STATE TRANSAKSI]: Kuantitas, Metode Pembayaran Pilihan, File Bukti Transfer
+  const [jumlah, setJumlah] = useState<number>(1);
+  const [metodePilihan, setMetodePilihan] = useState<string>('Tunai');
+  const [fileBukti, setFileBukti] = useState<File | null>(null);
+  const [previewBukti, setPreviewBukti] = useState<string>('');
 
   // [LOGIKA PRESISI]: Mengambil ID parameter rute secara aman dan sinkron
   useEffect(() => {
@@ -81,10 +88,82 @@ export default function PublicProductDetailPage() {
       }
 
       setProduk(dataProduk);
+      // Set default metode pembayaran pertama jika tersedia
+      if (dataProduk.toko?.metode_pembayaran) {
+        if (dataProduk.toko.metode_pembayaran.toLowerCase().includes('transfer')) {
+          setMetodePilihan('Transfer');
+        } else {
+          setMetodePilihan('Tunai');
+        }
+      }
     } catch (error: any) {
       console.error('Terjadi kesalahan sistem:', error.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // [FUNGSI PROSES PEMESANAN / TRANSAKSI]: Menyimpan data pesanan ke database tabel pesanan
+  const handleCheckout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!produk) return;
+
+    setIsSubmitting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) throw new Error('Anda harus login terlebih dahulu.');
+
+      let buktiUrl = null;
+
+      // Jika memilih metode transfer, wajib unggah bukti transfer
+      if (metodePilihan === 'Transfer') {
+        if (!fileBukti) {
+          throw new Error('Silakan unggah bukti transfer terlebih dahulu.');
+        }
+
+        const fileExt = fileBukti.name.split('.').pop();
+        const fileName = `bukti-${session.user.id}-${Date.now()}.${fileExt}`;
+        const filePath = `public/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('bukti-transfer') // Pastikan bucket storage 'bukti-transfer' tersedia di Supabase Anda
+          .upload(filePath, fileBukti);
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage
+          .from('bukti-transfer')
+          .getPublicUrl(filePath);
+
+        buktiUrl = publicUrlData.publicUrl;
+      }
+
+      const totalHarga = produk.harga * jumlah;
+
+      const { error: insertError } = await supabase
+        .from('pesanan')
+        .insert({
+          produk_id: produk.id,
+          toko_id: produk.toko_id,
+          pembeli_id: session.user.id,
+          jumlah: jumlah,
+          total_harga: totalHarga,
+          metode_pilihan: metodePilihan,
+          bukti_transfer: buktiUrl,
+          status: 'Belum Diterima',
+        });
+
+      if (insertError) throw insertError;
+
+      showToast('Pesanan berhasil dibuat! Status: Belum Diterima pemilik.', 'success');
+      // Reset form kecil
+      setJumlah(1);
+      setFileBukti(null);
+      setPreviewBukti('');
+    } catch (error: any) {
+      showToast('Gagal memproses pesanan: ' + error.message, 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -124,47 +203,49 @@ export default function PublicProductDetailPage() {
         >
           <i className="fa-solid fa-arrow-left"></i>
         </button>
-        <h1 className="text-xl font-bold text-amber-900">Detail Produk Publik</h1>
+        <h1 className="text-xl font-bold text-amber-900">Detail Produk & Pembayaran</h1>
       </div>
 
-      {/* Bagian Detail Produk */}
-      <div className="bg-white text-gray-900 rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-200 flex items-center justify-between bg-orange-50/30">
-          <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider">
+      {/* Bagian Detail Produk (Ukuran diperkecil dan lebih proporsional) */}
+      <div className="bg-white text-gray-900 rounded-xl shadow-sm border border-gray-200 overflow-hidden max-w-4xl mx-auto">
+        <div className="px-4 sm:px-5 py-3 border-b border-gray-200 flex items-center justify-between bg-orange-50/30">
+          <span className="bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
             {produk.jenis_produk?.nama || 'Tanpa Jenis'}
           </span>
-          <span className="text-xs sm:text-sm font-semibold text-gray-500">
+          <span className="text-xs font-semibold text-gray-500">
             Dijual di: <strong className="text-amber-900">{produk.toko?.nama || 'Toko'}</strong>
           </span>
         </div>
 
-        <div className="p-4 sm:p-6 md:p-8 flex flex-col md:flex-row gap-6 sm:gap-8 bg-white">
+        <div className="p-4 sm:p-6 flex flex-col md:flex-row gap-6 bg-white">
+          {/* Foto produk dengan ukuran lebih kecil/proporsional */}
           <div className="w-full md:w-1/3 flex-shrink-0">
-            <div className="aspect-square rounded-2xl overflow-hidden border-2 border-gray-100 shadow-sm bg-white flex items-center justify-center cursor-pointer" onClick={() => produk.foto && setPreviewImageUrl(produk.foto)}>
+            <div className="aspect-square w-48 mx-auto md:w-full rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-white flex items-center justify-center cursor-pointer" onClick={() => produk.foto && setPreviewImageUrl(produk.foto)}>
               {produk.foto ? (
                 <img src={produk.foto} alt={produk.nama} className="w-full h-full object-cover" />
               ) : (
-                <div className="text-center text-gray-400 bg-white p-4 rounded-2xl">
-                  <i className="fa-solid fa-box text-5xl sm:text-6xl mb-2 sm:mb-3 text-gray-300"></i>
-                  <p className="text-xs sm:text-sm font-medium text-gray-400">Tidak ada foto</p>
+                <div className="text-center text-gray-400 bg-white p-4">
+                  <i className="fa-solid fa-box text-4xl mb-2 text-gray-300"></i>
+                  <p className="text-xs font-medium text-gray-400">Tidak ada foto</p>
                 </div>
               )}
             </div>
           </div>
 
-          <div className="w-full md:w-2/3 flex flex-col bg-white justify-between">
+          <div className="w-full md:w-2/3 flex flex-col justify-between bg-white">
             <div>
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-3">{produk.nama}</h2>
-              <div className="mb-6">
-                <span className="text-2xl sm:text-3xl font-bold text-amber-900">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">{produk.nama}</h2>
+              <div className="mb-4">
+                <span className="text-xl sm:text-2xl font-bold text-amber-900">
                   {formatRupiah(produk.harga)}
                 </span>
+                <span className="text-xs text-gray-500 ml-2">per item</span>
               </div>
 
               {/* Informasi Toko Penjual Produk */}
-              <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3 mb-6">
-                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Informasi Penjual / Toko</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs sm:text-sm">
+              <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-200 space-y-2 mb-4 text-xs">
+                <h3 className="font-bold text-gray-500 uppercase tracking-wider">Informasi Penjual / Toko</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div>
                     <p className="text-gray-500">Nama Toko:</p>
                     <p className="font-semibold text-gray-900">{produk.toko?.nama || '-'}</p>
@@ -177,26 +258,113 @@ export default function PublicProductDetailPage() {
                     <p className="text-gray-500">Alamat:</p>
                     <p className="font-semibold text-gray-900">{produk.toko?.alamat || 'Tidak tersedia'}</p>
                   </div>
-                  <div className="sm:col-span-2">
-                    <p className="text-gray-500">Metode Pembayaran & Rekening:</p>
-                    <p className="font-semibold text-gray-900">{produk.toko?.metode_pembayaran || 'Tunai & Transfer'}</p>
-                    <p className="font-mono text-xs text-gray-600 mt-1">{produk.toko?.rekening || 'Tidak ada rekening khusus.'}</p>
-                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Tombol Kunjungi Toko */}
             <div>
               <Link
                 href={`/search/${produk.toko_id}`}
-                className="inline-flex items-center justify-center gap-2 bg-amber-800 hover:bg-amber-900 text-white px-5 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-colors shadow-sm"
+                className="inline-flex items-center gap-1.5 text-xs text-amber-800 hover:text-amber-900 font-semibold"
               >
                 <i className="fa-solid fa-store"></i>
-                <span>Kunjungi Toko Ini</span>
+                <span>Kunjungi Halaman Toko Ini</span>
               </Link>
             </div>
           </div>
+        </div>
+
+        {/* [FORMULIR TRANSAKSI / PEMBAYARAN]: Kuantitas, Dinamis Harga, Metode & Bukti Transfer */}
+        <div className="border-t border-gray-200 p-4 sm:p-6 bg-orange-50/20">
+          <h3 className="text-base font-bold text-amber-900 mb-4 flex items-center gap-2">
+            <i className="fa-solid fa-cart-shopping text-orange-600"></i>
+            <span>Formulir Pesanan & Pembayaran</span>
+          </h3>
+
+          <form onSubmit={handleCheckout} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Jumlah / Kuantitas Pesanan */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Jumlah Pembelian</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={jumlah}
+                  onChange={(e) => setJumlah(parseInt(e.target.value) || 1)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm bg-white text-gray-900 outline-none focus:ring-2 focus:ring-orange-500"
+                  required
+                />
+              </div>
+
+              {/* Total Harga Dinamis */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Total Harga Dinamis</label>
+                <div className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-xs sm:text-sm font-bold text-amber-900 flex items-center">
+                  {formatRupiah(produk.harga * jumlah)}
+                </div>
+              </div>
+            </div>
+
+            {/* Pilihan Jenis Pembayaran */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Pilih Metode Pembayaran</label>
+              <select
+                value={metodePilihan}
+                onChange={(e) => setMetodePilihan(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm bg-white text-gray-900 outline-none focus:ring-2 focus:ring-orange-500"
+              >
+                <option value="Tunai">Tunai (Cash)</option>
+                <option value="Transfer">Transfer Bank</option>
+              </select>
+            </div>
+
+            {/* Jika Memilih Transfer: Tampil Informasi Rekening & Upload Bukti Transfer */}
+            {metodePilihan === 'Transfer' && (
+              <div className="p-4 bg-white rounded-xl border border-orange-200 space-y-3">
+                <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900">
+                  <p className="font-bold mb-1"><i className="fa-solid fa-circle-info mr-1"></i> Informasi Rekening Tujuan:</p>
+                  <p className="font-mono whitespace-pre-wrap">{produk.toko?.rekening || 'Belum ada informasi rekening.'}</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Upload Bukti Transfer</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        const file = e.target.files[0];
+                        setFileBukti(file);
+                        setPreviewBukti(URL.createObjectURL(file));
+                      }
+                    }}
+                    className="w-full text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100"
+                    required
+                  />
+                  {previewBukti && (
+                    <div className="mt-2">
+                      <img src={previewBukti} alt="Pratinjau Bukti" className="w-32 h-32 object-cover rounded-lg border border-gray-200 shadow-sm" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Tombol Kirim Pesanan */}
+            <div className="pt-2 flex justify-end">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-colors shadow-sm flex items-center gap-2"
+              >
+                {isSubmitting ? (
+                  <><i className="fa-solid fa-circle-notch fa-spin"></i> Memproses Pesanan...</>
+                ) : (
+                  <><i className="fa-solid fa-paper-plane"></i> Kirim Pesanan Sekarang</>
+                )}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
 
