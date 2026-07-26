@@ -46,6 +46,10 @@ export default function PublicProductDetailPage() {
   const [fileBukti, setFileBukti] = useState<File | null>(null);
   const [previewBukti, setPreviewBukti] = useState<string>('');
 
+  // [STATE MODAL KONFIRMASI & HITUNG MUNDUR 5 DETIK]
+  const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
+  const [countdown, setCountdown] = useState<number>(5);
+
   // [LOGIKA PRESISI]: Mengambil ID parameter rute secara aman dan sinkron
   useEffect(() => {
     const resolveParams = async () => {
@@ -58,6 +62,17 @@ export default function PublicProductDetailPage() {
     };
     resolveParams();
   }, [params]);
+
+  // [EFEK HITUNG MUNDUR MODAL]: Mengatur jeda waktu 5 detik agar tombol konfirmasi aktif
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (showConfirmModal && countdown > 0) {
+      timer = setInterval(() => {
+        setCountdown((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [showConfirmModal, countdown]);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
@@ -104,8 +119,8 @@ export default function PublicProductDetailPage() {
     }
   };
 
-  // [FUNGSI PROSES PEMESANAN / TRANSAKSI]: Menyimpan data pesanan lengkap dengan alamat, telepon, dan unggahan bukti transfer
-  const handleCheckout = async (e: React.FormEvent) => {
+  // [FUNGSI INTERSEPSI SUBMIT]: Validasi awal sebelum memunculkan modal konfirmasi
+  const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!produk) return;
 
@@ -114,7 +129,22 @@ export default function PublicProductDetailPage() {
       return;
     }
 
+    if (metodePilihan === 'Transfer' && !fileBukti) {
+      showToast('Silakan unggah bukti transfer terlebih dahulu.', 'error');
+      return;
+    }
+
+    // Buka modal konfirmasi dan reset hitung mundur ke 5 detik
+    setCountdown(5);
+    setShowConfirmModal(true);
+  };
+
+  // [FUNGSI PROSES PEMESANAN / TRANSAKSI SEBENARNYA]: Menyimpan data pesanan ke database dan redirect ke beranda
+  const executeCheckout = async () => {
+    if (!produk) return;
+
     setIsSubmitting(true);
+    setShowConfirmModal(false);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) throw new Error('Anda harus login terlebih dahulu.');
@@ -163,15 +193,11 @@ export default function PublicProductDetailPage() {
 
       if (insertError) throw insertError;
 
-      showToast('Pesanan berhasil dibuat! Status: Belum Diterima pemilik.', 'success');
-      setJumlah(1);
-      setAlamatPembeli('');
-      setTeleponPembeli('');
-      setFileBukti(null);
-      setPreviewBukti('');
+      // Simpan flash toast sukses di localStorage atau langsung redirect dengan query/router state, lalu arahkan ke /beranda
+      localStorage.setItem('flash_toast', 'Pesanan berhasil dibuat! Status: Belum Diterima pemilik.');
+      router.push('/beranda');
     } catch (error: any) {
       showToast('Gagal memproses pesanan: ' + error.message, 'error');
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -292,7 +318,7 @@ export default function PublicProductDetailPage() {
           </div>
 
           <div className="p-4 sm:p-6 bg-white">
-            <form onSubmit={handleCheckout} className="space-y-4">
+            <form onSubmit={handleFormSubmit} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Jumlah / Kuantitas Pesanan */}
                 <div>
@@ -394,11 +420,7 @@ export default function PublicProductDetailPage() {
                   disabled={isSubmitting}
                   className="w-full sm:w-auto bg-orange-600 hover:bg-orange-700 text-white px-6 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-colors shadow-sm flex items-center justify-center gap-2"
                 >
-                  {isSubmitting ? (
-                    <><i className="fa-solid fa-circle-notch fa-spin"></i> Memproses Pesanan...</>
-                  ) : (
-                    <><i className="fa-solid fa-paper-plane"></i> Kirim Pesanan Sekarang</>
-                  )}
+                  <i className="fa-solid fa-paper-plane"></i> Kirim Pesanan Sekarang
                 </button>
               </div>
             </form>
@@ -406,6 +428,42 @@ export default function PublicProductDetailPage() {
         </div>
 
       </div>
+
+      {/* [MODAL KONFIRMASI PESANAN]: Muncul saat tombol kirim ditekan dengan jeda hitung mundur 5 detik */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-200 space-y-4 text-center">
+            <div className="w-14 h-14 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mx-auto text-2xl">
+              <i className="fa-solid fa-circle-question"></i>
+            </div>
+            <h3 className="text-lg font-bold text-gray-900">Konfirmasi Pesanan</h3>
+            <p className="text-xs sm:text-sm text-gray-600">
+              Apakah semua informasi pesanan, jumlah, alamat, dan pembayaran sudah benar?
+            </p>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-300 text-gray-700 text-xs sm:text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={countdown > 0 || isSubmitting}
+                onClick={executeCheckout}
+                className={`flex-1 px-4 py-2.5 rounded-xl text-white text-xs sm:text-sm font-medium transition-colors shadow-sm ${
+                  countdown > 0 
+                    ? 'bg-gray-400 cursor-not-allowed' 
+                    : 'bg-orange-600 hover:bg-orange-700'
+                }`}
+              >
+                {countdown > 0 ? `Tunggu (${countdown}s)` : 'Ya, Proses Sekarang'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Preview Gambar */}
       {previewImageUrl && (
