@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
-// [BARU]: Mengimpor helper terpisah untuk mengirim pesan permintaan masuk toko
+// Mengimpor helper terpisah untuk mengirim pesan permintaan masuk toko
 import { kirimpesanpermintaanmasuktoko } from '@/utils/kirimpesanpermintaanmasuktoko';
 
 interface Kategori {
@@ -268,7 +268,7 @@ export default function StorePage() {
 
       if (updateError) throw updateError;
 
-      // [BARU]: Memanggil helper kirimpesanpermintaanmasuktoko
+      // Memanggil helper kirimpesanpermintaanmasuktoko
       await kirimpesanpermintaanmasuktoko(
         targetToko.user_id,
         targetToko.id,
@@ -433,7 +433,8 @@ export default function StorePage() {
             const isPending = toko.status_keanggotaan === 'pending';
             
             return (
-              <div key={toko.id} className="relative bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-orange-200 transition-all group flex flex-col overflow-hidden">
+              /* [PENYESUAIAN MOBILE]: Mengurangi ukuran card toko secara responsif pada perangkat seluler */
+              <div key={toko.id} className="relative bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-orange-200 transition-all group flex flex-col overflow-hidden max-w-[240px] sm:max-w-none mx-auto sm:mx-0 w-full">
                 
                 <div className="absolute top-3 left-3 z-10">
                   <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-sm ${
@@ -492,55 +493,55 @@ export default function StorePage() {
 
                 {isPending ? (
                   <div className="flex flex-col flex-grow cursor-not-allowed opacity-75">
-                    <div className="h-44 sm:h-48 w-full bg-gray-100 flex-shrink-0 relative">
+                    <div className="h-28 sm:h-48 w-full bg-gray-100 flex-shrink-0 relative">
                       {toko.foto ? (
                         <img src={toko.foto} alt={toko.nama} className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-gray-300">
-                          <i className="fa-solid fa-image text-4xl sm:text-5xl"></i>
+                          <i className="fa-solid fa-image text-3xl sm:text-5xl"></i>
                         </div>
                       )}
                     </div>
-                    <div className="p-4 sm:p-5 flex flex-col flex-grow">
+                    <div className="p-3 sm:p-5 flex flex-col flex-grow">
                       <div className="flex flex-col gap-1 mb-2 sm:mb-3">
-                        <span className="w-fit bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded text-[9px] sm:text-[10px] font-bold uppercase tracking-wider">
+                        <span className="w-fit bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-[8px] sm:text-[10px] font-bold uppercase tracking-wider">
                           {toko.kategori_toko?.nama || 'Tanpa Kategori'}
                         </span>
-                        <h3 className="text-base sm:text-lg font-bold text-amber-900 line-clamp-1">
+                        <h3 className="text-sm sm:text-lg font-bold text-amber-900 line-clamp-1">
                           {toko.nama}
                         </h3>
                       </div>
-                      <p className="text-xs sm:text-sm text-yellow-600 font-medium italic mb-2">
+                      <p className="text-[11px] sm:text-sm text-yellow-600 font-medium italic mb-2">
                         Menunggu persetujuan pemilik toko...
                       </p>
-                      <p className="text-xs sm:text-sm text-gray-500 line-clamp-2 leading-relaxed">
+                      <p className="text-[11px] sm:text-sm text-gray-500 line-clamp-2 leading-relaxed">
                         {toko.deskripsi ? toko.deskripsi : <span className="italic">Tidak ada deskripsi.</span>}
                       </p>
                     </div>
                   </div>
                 ) : (
                   <Link href={`/store/${toko.id}`} className="flex flex-col flex-grow outline-none focus:ring-2 focus:ring-orange-500 rounded-xl">
-                    <div className="h-44 sm:h-48 w-full bg-gray-100 flex-shrink-0 relative">
+                    <div className="h-28 sm:h-48 w-full bg-gray-100 flex-shrink-0 relative">
                       {toko.foto ? (
                         <img src={toko.foto} alt={toko.nama} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-gray-300">
-                          <i className="fa-solid fa-image text-4xl sm:text-5xl"></i>
+                          <i className="fa-solid fa-image text-3xl sm:text-5xl"></i>
                         </div>
                       )}
                     </div>
                     
-                    <div className="p-4 sm:p-5 flex flex-col flex-grow">
+                    <div className="p-3 sm:p-5 flex flex-col flex-grow">
                       <div className="flex flex-col gap-1 mb-2 sm:mb-3">
-                        <span className="w-fit bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded text-[9px] sm:text-[10px] font-bold uppercase tracking-wider">
+                        <span className="w-fit bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-[8px] sm:text-[10px] font-bold uppercase tracking-wider">
                           {toko.kategori_toko?.nama || 'Tanpa Kategori'}
                         </span>
-                        <h3 className="text-base sm:text-lg font-bold text-amber-900 group-hover:text-orange-700 transition-colors line-clamp-1">
+                        <h3 className="text-sm sm:text-lg font-bold text-amber-900 group-hover:text-orange-700 transition-colors line-clamp-1">
                           {toko.nama}
                         </h3>
                       </div>
                       
-                      <p className="text-xs sm:text-sm text-gray-500 line-clamp-3 leading-relaxed">
+                      <p className="text-[11px] sm:text-sm text-gray-500 line-clamp-3 leading-relaxed">
                         {toko.deskripsi ? toko.deskripsi : <span className="italic">Tidak ada deskripsi.</span>}
                       </p>
                     </div>
