@@ -2,8 +2,8 @@
 import { createClient } from '@/utils/supabase/client';
 
 /**
- * [HELPER TERPISAH]: Mengirim pesan pemberitahuan permintaan masuk toko ke pemilik toko
- * Menangani parameter opsional atau nilai null secara aman agar terhindar dari runtime error.
+ * [HELPER TERPISAH]: Mengirim pesan pemberitahuan permintaan masuk toko ke pemilik toko.
+ * Menyisipkan ID toko ke dalam pesan agar dapat diekstrak untuk navigasi langsung ke parameter ID toko.
  */
 export async function kirimpesanpermintaanmasuktoko(
   ownerId: string | null | undefined, 
@@ -26,12 +26,15 @@ export async function kirimpesanpermintaanmasuktoko(
     const safeUserName = userName || 'Pengguna';
     const safeUserEmail = userEmail || 'Email tidak tersedia';
 
+    // Menyisipkan format ID toko di dalam string pesan agar mudah diurai (parsing) oleh helper aksi notifikasi
+    const structuredMessage = `Pengguna "${safeUserName}" (${safeUserEmail}) meminta untuk bergabung ke toko "${safeStoreName}". [STORE_ID:${storeId}]`;
+
     const { error } = await supabase
       .from('notifikasi')
       .insert({
         user_id: ownerId,
         title: 'Permintaan Gabung Toko',
-        message: `Pengguna "${safeUserName}" (${safeUserEmail}) meminta untuk bergabung ke toko "${safeStoreName}".`,
+        message: structuredMessage,
         is_read: false,
       });
 
