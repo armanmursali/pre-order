@@ -141,7 +141,6 @@ export default function StoreDetailPage() {
 
       setToko(dataToko);
 
-      // [PERBAIKAN PRESISI]: Mengambil data anggota toko dari user_toko lalu mencocokkan namanya dari tabel public.users secara aman
       const { data: dataAnggota } = await supabase
         .from('user_toko')
         .select('*')
@@ -154,8 +153,9 @@ export default function StoreDetailPage() {
           .select('id, nama, email')
           .in('id', userIds);
 
+        // [PERBAIKAN PRESISI]: Memperbaiki kesalahan ketik 'uomap' menjadi pencarian data user yang bersih
         const formattedAnggota = dataAnggota.map((item: any) => {
-          const matchedUser = dataUsers?.uomap ? null : dataUsers?.find((u: any) => u.id === item.user_id);
+          const matchedUser = dataUsers?.find((u: any) => u.id === item.user_id);
           return {
             id: item.id,
             user_id: item.user_id,
@@ -397,7 +397,7 @@ export default function StoreDetailPage() {
         />
       )}
 
-      {/* [PERBAIKAN TAMPILAN]: Membuka batasan overflow agar tombol aksi titik tiga tidak terpotong */}
+      {/* Panel Anggota Toko */}
       {isOwner && (
         <div className="bg-amber-50/60 rounded-xl shadow-sm border border-amber-200">
           <button
@@ -419,7 +419,6 @@ export default function StoreDetailPage() {
                 anggotas.map((item) => (
                   <div key={item.id} className="py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative">
                     <div className="overflow-hidden">
-                      {/* [PERBAIKAN]: Menampilkan Nama dan Email user yang diambil dari tabel public.users */}
                       <h4 className="font-bold text-gray-900 text-xs sm:text-sm">{item.nama_user}</h4>
                       <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5">{item.email_user}</p>
                       <span className={`inline-block mt-1.5 px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold uppercase tracking-wider ${
