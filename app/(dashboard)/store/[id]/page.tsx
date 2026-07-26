@@ -85,7 +85,6 @@ export default function StoreDetailPage() {
     }).format(angka);
   };
 
-  // [BARU]: Fungsi untuk menyalin ID Toko ke clipboard
   const handleCopyId = (id: string) => {
     navigator.clipboard.writeText(id);
     showToast('ID Toko berhasil disalin ke clipboard!', 'success');
@@ -123,11 +122,11 @@ export default function StoreDetailPage() {
       const userId = session.user.id;
       let listAnggota = Array.isArray(dataToko.anggota) ? dataToko.anggota : [];
       
-      // Pastikan pemilik utama selalu terdaftar di dalam list anggota agar namanya tampil
       const primaryOwnerId = dataToko.user_id;
       const isPrimaryOwner = primaryOwnerId === userId;
+      
+      // Pastikan pemilik utama selalu ada dalam daftar array anggota
       const ownerExists = listAnggota.some((m: any) => m.user_id === primaryOwnerId);
-
       if (!ownerExists) {
         const { data: ownerProfile } = await supabase
           .from('users')
@@ -151,6 +150,7 @@ export default function StoreDetailPage() {
 
       const isApproved = memberEntry?.status === 'tergabung';
 
+      // PENGAMANAN: Jika user bukan pemilik dan bukan anggota tergabung/pending, tolak akses
       if (!isUserOwner && !isApproved && memberEntry?.status !== 'pending') {
         showToast('Anda tidak memiliki akses ke toko ini.', 'error');
         router.push('/store');
@@ -181,7 +181,7 @@ export default function StoreDetailPage() {
     }
   };
 
-  // [LOGIKA STATUS ANGGOTA]: Mengatur terima, ubah jadi pemilik, atau keluar/keluarkan
+  // [PERBAIKAN LOGIKA KICK / KELUAR]: Memastikan penghapusan anggota (termasuk sesama pemilik atau pemilik utama jika dikick) membersihkan data dari array anggota
   const handleUpdateAnggotaStatus = async (targetUserId: string, newStatus: string) => {
     if (!toko) return;
     try {
@@ -192,35 +192,57 @@ export default function StoreDetailPage() {
       let updatedAnggota = [...currentAnggota];
 
       if (newStatus === 'keluar' || newStatus === 'kick') {
+        // Hapus user dari array anggota
         updatedAnggota = updatedAnggota.filter((m: any) => m.user_id !== targetUserId);
+
+        // [LOGIKA TAMBAHAN]: Jika yang di-kick adalah pemilik utama (toko.user_id), kita pindahkan kepemilikan utama ke anggota lain atau hapus relasi user_id di tabel toko
+        let updatePayload: any = { anggota: updatedAnggota };
+        if (targetUserId === toko.user_id) {
+          // Jika pemilik utama dikeluarkan, cari pemilik/anggota lain untuk dijadikan user_id utama, atau set null jika kosong
+          const remainingOwner = updatedAnggota.find((m: any) => m.status === 'pemilik');
+          if (remainingOwner) {
+            updatePayload.user_id = remainingOwner.user_id;
+          } else if (updatedAnggota.length > 0) {
+            updatePayload.user_id = updatedAnggota[0].user_id;
+            updatedAnggota[0].status = 'pemilik';
+          }
+        }
+
+        const { error } = await supabase
+          .from('toko')
+          .update(updatePayload)
+          .eq('id', toko.id);
+
+        if (error) throw error;
       } else {
+        // Pembaruan status (misal: 'tergabung' atau 'pemilik')
         updatedAnggota = updatedAnggota.map((m: any) => {
           if (m.user_id === targetUserId) {
             return { ...m, status: newStatus };
           }
           return m;
         });
+
+        const { error } = await supabase
+          .from('toko')
+          .update({ anggota: updatedAnggota })
+          .eq('id', toko.id);
+
+        if (error) throw error;
       }
-
-      const { error } = await supabase
-        .from('toko')
-        .update({ anggota: updatedAnggota })
-        .eq('id', toko.id);
-
-      if (error) throw error;
 
       showToast(
         newStatus === 'keluar' 
           ? 'Anda berhasil keluar dari toko.' 
           : newStatus === 'kick' 
-          ? 'Anggota berhasil dikeluarkan.' 
+          ? 'Anggota berhasil dikeluarkan dan kehilangan akses toko.' 
           : newStatus === 'pemilik' 
           ? 'Anggota berhasil diubah menjadi Pemilik toko!' 
           : 'Status anggota berhasil diperbarui menjadi Tergabung!', 
         'success'
       );
 
-      if (newStatus === 'keluar') {
+      if (newStatus === 'keluar' || (newStatus === 'kick' && targetUserId === currentUserId)) {
         router.push('/store');
       } else {
         fetchAllData(toko.id);
@@ -458,7 +480,6 @@ export default function StoreDetailPage() {
                   <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Kategori Utama</p>
                   <p className="text-sm sm:text-base font-medium text-gray-900">{toko.kategori_toko?.nama || '-'}</p>
                 </div>
-                {/* [PERBAIKAN]: Menampilkan ID Toko yang bersih lengkap dengan tombol Salin */}
                 <div className="p-3.5 sm:p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between gap-2">
                   <div className="overflow-hidden">
                     <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">ID Toko</p>
@@ -614,7 +635,7 @@ export default function StoreDetailPage() {
         )}
       </div>
 
-      {/* [PERBAIKAN POSISI]: Panel Daftar Anggota Toko dipindah ke bagian BAWAH detail toko */}
+      {/* Panel Daftar Anggota di Bagian Bawah Detail Toko */}
       {isOwner && (
         <div className="bg-amber-50/60 rounded-xl shadow-sm border border-amber-200">
           <button
@@ -682,7 +703,7 @@ export default function StoreDetailPage() {
                                 <i className="fa-solid fa-user-shield w-4"></i> Ubah Jadi Pemilik
                               </button>
                             )}
-                            {/* [LOGIKA KELUAR / KELUARKAN]: Jika akun sendiri bertuliskan 'Keluar', jika akun lain bertuliskan 'Keluarkan' */}
+                            {/* [LOGIKA UTAMA]: Jika mendeteksi diri sendiri, teks aksi menjadi 'Keluar'. Jika mendeteksi anggota lain (termasuk pemilik lain), teks menjadi 'Keluarkan' dan menghapus data total dari tabel */}
                             <button
                               onClick={() => handleUpdateAnggotaStatus(item.user_id, isMe ? 'keluar' : 'kick')}
                               className="w-full text-left px-4 py-2 text-xs sm:text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors font-medium"
