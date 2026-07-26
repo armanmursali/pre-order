@@ -1,0 +1,282 @@
+// app/(dashboard)/search/[id]/page.tsx
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { createClient } from '@/utils/supabase/client';
+import Link from 'next/link';
+
+interface TokoDetail {
+  id: string;
+  user_id: string;
+  nama: string;
+  deskripsi?: string | null;
+  foto: string | null;
+  created_at: string;
+  telepon?: string | null;
+  alamat?: string | null;
+  rekening?: string | null;
+  metode_pembayaran?: string | null;
+  kategori_toko?: {
+    nama: string;
+  };
+}
+
+interface Produk {
+  id: string;
+  toko_id: string;
+  nama: string;
+  harga: number;
+  foto: string | null;
+  jenis_produk?: {
+    nama: string;
+  };
+}
+
+export default function PublicStoreDetailPage() {
+  const params = useParams<{ id: string }>();
+  const router = useRouter();
+  const supabase = createClient();
+
+  const [toko, setToko] = useState<TokoDetail | null>(null);
+  const [produks, setProduks] = useState<Produk[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  useEffect(() => {
+    if (params?.id) {
+      fetchPublicStoreData(params.id);
+    }
+  }, [params?.id]);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const formatRupiah = (angka: number) => {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0,
+    }).format(angka);
+  };
+
+  // [FUNGSI AMBIL DATA PUBLIK]: Mengambil data informasi toko milik orang lain dan produknya
+  const fetchPublicStoreData = async (tokoId: string) => {
+    try {
+      setLoading(true);
+
+      // 1. Ambil informasi detail toko
+      const { data: dataToko, error: errorToko } = await supabase
+        .from('toko')
+        .select('*, kategori_toko(nama)')
+        .eq('id', tokoId)
+        .single();
+
+      if (errorToko || !dataToko) {
+        showToast('Toko tidak ditemukan.', 'error');
+        router.push('/beranda');
+        return;
+      }
+
+      setToko(dataToko);
+
+      // 2. Ambil daftar produk yang dijual di toko tersebut
+      const { data: dataProduk } = await supabase
+        .from('produk')
+        .select('*, jenis_produk(nama)')
+        .eq('toko_id', tokoId)
+        .order('created_at', { ascending: false });
+
+      if (dataProduk) {
+        setProduks(dataProduk);
+      }
+    } catch (error: any) {
+      console.error('Terjadi kesalahan sistem:', error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 flex flex-col items-center justify-center min-h-[400px]">
+        <i className="fa-solid fa-circle-notch fa-spin text-4xl text-orange-600 mb-4"></i>
+        <p className="text-gray-500 font-medium">Memuat informasi toko...</p>
+      </div>
+    );
+  }
+
+  if (!toko) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-6 relative p-0.5 sm:p-6">
+      {/* Tombol Kembali ke Beranda */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => router.push('/beranda')}
+          className="w-9 h-9 flex items-center justify-center rounded-xl bg-white border border-gray-200 text-gray-600 hover:bg-orange-50 hover:text-orange-700 transition-colors shadow-sm"
+          title="Kembali ke Beranda"
+        >
+          <i className="fa-solid fa-arrow-left"></i>
+        </button>
+        <h1 className="text-xl font-bold text-amber-900">Kunjungan Toko</h1>
+      </div>
+
+      {/* Bagian Detail Informasi Toko (Read-Only untuk Pengunjung) */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-200 flex items-center justify-between bg-orange-50/30">
+          <h2 className="text-base sm:text-lg font-bold text-amber-900">Informasi Toko</h2>
+          <span className="bg-orange-100 text-orange-800 px-3 sm:px-4 py-1.5 rounded-full text-[10px] sm:text-xs font-bold tracking-wide">
+            {toko.kategori_toko?.nama || 'Tanpa Kategori'}
+          </span>
+        </div>
+
+        <div className="p-4 sm:p-6 md:p-8 flex flex-col md:flex-row gap-6 sm:gap-8">
+          <div className="w-full md:w-1/3 flex-shrink-0">
+            <div className="aspect-square rounded-2xl overflow-hidden border-2 border-gray-100 shadow-sm bg-gray-50 flex items-center justify-center cursor-pointer" onClick={() => toko.foto && setPreviewImageUrl(toko.foto)}>
+              {toko.foto ? (
+                <img src={toko.foto} alt={toko.nama} className="w-full h-full object-cover" />
+              ) : (
+                <div className="text-center text-gray-400">
+                  <i className="fa-solid fa-store text-5xl sm:text-6xl mb-2 sm:mb-3"></i>
+                  <p className="text-xs sm:text-sm font-medium">Tidak ada foto</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="w-full md:w-2/3 flex flex-col">
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-2">{toko.nama}</h2>
+            <p className="text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6 flex items-center gap-2">
+              <i className="fa-regular fa-calendar-days"></i>
+              Terdaftar pada {new Date(toko.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+            </p>
+
+            <div className="space-y-3 sm:space-y-4">
+              <div className="p-3.5 sm:p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 sm:mb-2">Deskripsi Toko</p>
+                <p className="text-xs sm:text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                  {toko.deskripsi ? toko.deskripsi : <span className="italic text-gray-400">Tidak ada deskripsi yang ditambahkan.</span>}
+                </p>
+              </div>
+
+              {/* Informasi Kontak, Alamat, Rekening, dan Metode Pembayaran */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                <div className="p-3.5 sm:p-4 bg-gray-50 rounded-xl border border-gray-100">
+                  <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Nomor Telepon / WhatsApp</p>
+                  <p className="text-xs sm:text-sm font-medium text-gray-900 flex items-center gap-2">
+                    <i className="fa-solid fa-phone text-orange-600"></i>
+                    {toko.telepon ? toko.telepon : <span className="italic text-gray-400">Tidak tersedia</span>}
+                  </p>
+                </div>
+
+                <div className="p-3.5 sm:p-4 bg-gray-50 rounded-xl border border-gray-100">
+                  <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Metode Pembayaran</p>
+                  <p className="text-xs sm:text-sm font-medium text-gray-900 flex items-center gap-2">
+                    <i className="fa-solid fa-wallet text-orange-600"></i>
+                    {toko.metode_pembayaran ? toko.metode_pembayaran : <span className="italic text-gray-400">Tunai & Transfer</span>}
+                  </p>
+                </div>
+
+                <div className="p-3.5 sm:p-4 bg-gray-50 rounded-xl border border-gray-100 md:col-span-2">
+                  <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Alamat Lengkap</p>
+                  <p className="text-xs sm:text-sm font-medium text-gray-900 flex items-start gap-2">
+                    <i className="fa-solid fa-location-dot text-orange-600 mt-0.5"></i>
+                    <span>{toko.alamat ? toko.alamat : <span className="italic text-gray-400">Tidak tersedia</span>}</span>
+                  </p>
+                </div>
+
+                <div className="p-3.5 sm:p-4 bg-gray-50 rounded-xl border border-gray-100 md:col-span-2">
+                  <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Rekening Pembayaran (Transfer)</p>
+                  <p className="text-xs sm:text-sm font-medium text-gray-900 flex items-start gap-2">
+                    <i className="fa-solid fa-credit-card text-orange-600 mt-0.5"></i>
+                    <span className="whitespace-pre-wrap">{toko.rekening ? toko.rekening : <span className="italic text-gray-400">Tidak ada informasi rekening.</span>}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bagian Daftar Produk Toko */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+        <div className="mb-4 sm:mb-6 border-b border-gray-100 pb-3.5 sm:pb-4">
+          <h2 className="text-lg sm:text-xl font-bold text-amber-900">Produk yang Dijual</h2>
+          <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Daftar barang dan produk dari toko ini.</p>
+        </div>
+
+        {produks.length === 0 ? (
+          <div className="text-center py-10 sm:py-12 text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-300 text-xs sm:text-sm">
+            <i className="fa-solid fa-box-open text-3xl sm:text-4xl mb-2 sm:mb-3 text-gray-400"></i>
+            <p>Toko ini belum memiliki produk.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {produks.map((produk) => (
+              <div key={produk.id} className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all flex flex-col overflow-hidden">
+                <div className="h-48 w-full bg-gray-100 flex-shrink-0 relative cursor-pointer" onClick={() => produk.foto && setPreviewImageUrl(produk.foto)}>
+                  {produk.foto ? (
+                    <img src={produk.foto} alt={produk.nama} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-300">
+                      <i className="fa-solid fa-box text-5xl"></i>
+                    </div>
+                  )}
+                  <div className="absolute bottom-3 left-3 bg-amber-900/90 backdrop-blur-sm text-white px-3 py-1 rounded-lg font-bold shadow-sm text-sm">
+                    {formatRupiah(produk.harga)}
+                  </div>
+                </div>
+                
+                <div className="p-5 flex flex-col flex-grow">
+                  <span className="w-fit bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider mb-2">
+                    {produk.jenis_produk?.nama || 'Tanpa Jenis'}
+                  </span>
+                  <h3 className="text-lg font-bold text-gray-900 leading-tight">
+                    {produk.nama}
+                  </h3>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Modal Preview Gambar */}
+      {previewImageUrl && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md" onClick={() => setPreviewImageUrl(null)}>
+          <div className="relative max-w-4xl w-full max-h-[90vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setPreviewImageUrl(null)}
+              className="absolute -top-12 right-0 text-white hover:text-orange-400 transition-colors text-3xl font-bold"
+              title="Tutup"
+            >
+              <i className="fa-solid fa-xmark"></i>
+            </button>
+            <img
+              src={previewImageUrl}
+              alt="Pratinjau Penuh"
+              className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl border border-gray-700"
+            />
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[200] transition-all duration-300 ease-in-out">
+          <div className={`flex items-center gap-2.5 sm:gap-3 px-4 sm:px-5 py-3 sm:py-3.5 rounded-xl shadow-xl text-white font-medium ${
+            toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+          }`}>
+            <i className={`fa-solid ${toast.type === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'} text-lg sm:text-xl`}></i>
+            <span className="text-xs sm:text-sm tracking-wide">{toast.message}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
