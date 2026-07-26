@@ -40,7 +40,6 @@ export default function StorePage() {
   const [tokoToDelete, setTokoToDelete] = useState<Toko | null>(null);
   const [deleteInputName, setDeleteInputName] = useState<string>('');
   
-  // [PERBAIKAN]: Memastikan state modal Gabung Toko terdefinisi dan aktif
   const [isJoinModalOpen, setIsJoinModalOpen] = useState<boolean>(false);
   const [joinStoreId, setJoinStoreId] = useState<string>('');
 
@@ -167,7 +166,6 @@ export default function StorePage() {
     setDeleteInputName('');
   };
 
-  // [PERBAIKAN]: Fungsi untuk menangani proses gabung toko berdasarkan ID Toko
   const handleJoinStore = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!joinStoreId.trim()) {
@@ -314,7 +312,8 @@ export default function StorePage() {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative">
+    /* [PENYESUAIAN RESPONSIF]: Mengubah padding container menjadi px-0.5 di mobile, dan sm:p-6 di desktop */
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-0.5 sm:p-6 relative">
       
       {activeDropdown && (
         <div 
@@ -323,16 +322,16 @@ export default function StorePage() {
         />
       )}
 
-      {/* [PERBAIKAN]: Menyertakan tombol Gabung Toko dan Tambah Toko secara berdampingan */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+      {/* [PENYESUAIAN RESPONSIF]: Ukuran teks judul dan tombol disesuaikan untuk layar kecil */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6 px-2 sm:px-0">
         <div>
-          <h1 className="text-2xl font-bold text-amber-900">Manajemen Toko (Store)</h1>
-          <p className="text-sm text-gray-500 mt-1">Kelola data toko dan kategori Anda di sini.</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-amber-900">Manajemen Toko (Store)</h1>
+          <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Kelola data toko dan kategori Anda di sini.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
             onClick={() => setIsJoinModalOpen(true)}
-            className="flex items-center gap-2 bg-amber-800 hover:bg-amber-900 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-amber-800 hover:bg-amber-900 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors shadow-sm"
           >
             <i className="fa-solid fa-right-to-bracket"></i>
             <span>Gabung Toko</span>
@@ -340,7 +339,7 @@ export default function StorePage() {
           
           <button
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-orange-600 hover:bg-orange-700 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors shadow-sm"
           >
             <i className="fa-solid fa-plus"></i>
             <span>Tambah Toko</span>
@@ -349,17 +348,17 @@ export default function StorePage() {
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-gray-500">
-          <i className="fa-solid fa-circle-notch fa-spin text-3xl mb-3 block text-orange-600"></i>
+        <div className="text-center py-12 text-gray-500 text-sm">
+          <i className="fa-solid fa-circle-notch fa-spin text-2xl sm:text-3xl mb-2 sm:mb-3 block text-orange-600"></i>
           Memuat data toko...
         </div>
       ) : tokos.length === 0 ? (
-        <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-300">
-          <i className="fa-solid fa-store-slash text-4xl mb-3 text-gray-400"></i>
+        <div className="text-center py-10 sm:py-12 text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-300 text-xs sm:text-sm mx-2 sm:mx-0">
+          <i className="fa-solid fa-store-slash text-3xl sm:text-4xl mb-2 sm:mb-3 text-gray-400"></i>
           <p>Belum ada data toko. Silakan tambahkan toko baru atau gabung ke toko lain.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 px-2 sm:px-0">
           {tokos.map((toko) => (
             <div key={toko.id} className="relative bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-orange-200 transition-all group flex flex-col overflow-hidden">
               
@@ -385,7 +384,7 @@ export default function StorePage() {
                           e.stopPropagation();
                           openEditModal(toko);
                         }}
-                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 flex items-center gap-2 transition-colors"
+                        className="w-full text-left px-4 py-2 text-xs sm:text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 flex items-center gap-2 transition-colors"
                       >
                         <i className="fa-solid fa-pen-to-square w-4"></i> Edit
                       </button>
@@ -395,7 +394,7 @@ export default function StorePage() {
                           e.stopPropagation();
                           openDeleteModal(toko);
                         }}
-                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                        className="w-full text-left px-4 py-2 text-xs sm:text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
                       >
                         <i className="fa-solid fa-trash w-4"></i> Hapus
                       </button>
@@ -405,27 +404,27 @@ export default function StorePage() {
               </div>
 
               <Link href={`/store/${toko.id}`} className="flex flex-col flex-grow outline-none focus:ring-2 focus:ring-orange-500 rounded-xl">
-                <div className="h-48 w-full bg-gray-100 flex-shrink-0 relative">
+                <div className="h-44 sm:h-48 w-full bg-gray-100 flex-shrink-0 relative">
                   {toko.foto ? (
                     <img src={toko.foto} alt={toko.nama} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-300">
-                      <i className="fa-solid fa-image text-5xl"></i>
+                      <i className="fa-solid fa-image text-4xl sm:text-5xl"></i>
                     </div>
                   )}
                 </div>
                 
-                <div className="p-5 flex flex-col flex-grow">
-                  <div className="flex flex-col gap-1 mb-3">
-                    <span className="w-fit bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
+                <div className="p-4 sm:p-5 flex flex-col flex-grow">
+                  <div className="flex flex-col gap-1 mb-2 sm:mb-3">
+                    <span className="w-fit bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded text-[9px] sm:text-[10px] font-bold uppercase tracking-wider">
                       {toko.kategori_toko?.nama || 'Tanpa Kategori'}
                     </span>
-                    <h3 className="text-lg font-bold text-amber-900 group-hover:text-orange-700 transition-colors line-clamp-1">
+                    <h3 className="text-base sm:text-lg font-bold text-amber-900 group-hover:text-orange-700 transition-colors line-clamp-1">
                       {toko.nama}
                     </h3>
                   </div>
                   
-                  <p className="text-sm text-gray-500 line-clamp-3 leading-relaxed">
+                  <p className="text-xs sm:text-sm text-gray-500 line-clamp-3 leading-relaxed">
                     {toko.deskripsi ? toko.deskripsi : <span className="italic">Tidak ada deskripsi.</span>}
                   </p>
                 </div>
@@ -436,39 +435,39 @@ export default function StorePage() {
       )}
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-bold text-amber-900">
+            <div className="flex justify-between items-center px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
+              <h2 className="text-base sm:text-lg font-bold text-amber-900">
                 {editId ? 'Edit Data Toko' : 'Tambah Toko Baru'}
               </h2>
               <button onClick={closeModal} className="text-gray-400 hover:text-red-500 transition-colors">
-                <i className="fa-solid fa-xmark text-xl"></i>
+                <i className="fa-solid fa-xmark text-lg sm:text-xl"></i>
               </button>
             </div>
             
             <div className="overflow-y-auto">
-              <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-3 sm:space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Nama Toko</label>
+                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1">Nama Toko</label>
                   <input
                     type="text"
                     name="nama"
                     value={formData.nama}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-xs sm:text-sm transition-all"
                     placeholder="Masukkan nama toko"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Kategori Toko</label>
+                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1">Kategori Toko</label>
                   <select
                     name="kategori_id"
                     value={formData.kategori_id}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all bg-white"
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-xs sm:text-sm transition-all bg-white"
                     required
                   >
                     <option value="" disabled>-- Pilih Kategori --</option>
@@ -481,48 +480,48 @@ export default function StorePage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Deskripsi Toko (Opsional)</label>
+                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1">Deskripsi Toko (Opsional)</label>
                   <textarea
                     name="deskripsi"
                     value={formData.deskripsi}
                     onChange={handleInputChange}
                     rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all resize-none"
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-xs sm:text-sm transition-all resize-none"
                     placeholder="Tuliskan deksripsi singkat toko..."
                   ></textarea>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Foto Toko</label>
+                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1">Foto Toko</label>
                   <input
                     type="file"
                     accept="image/*"
                     onChange={handleFileChange}
-                    className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 transition-colors"
+                    className="w-full text-xs sm:text-sm text-gray-500 file:mr-3 sm:file:mr-4 file:py-1.5 sm:file:py-2 file:px-3 sm:file:px-4 file:rounded-lg file:border-0 file:text-xs sm:file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 transition-colors"
                   />
                   {formData.previewFoto && (
                     <div className="mt-3">
                       <img
                         src={formData.previewFoto}
                         alt="Pratinjau"
-                        className="w-full h-32 object-cover rounded-lg border border-gray-200 shadow-sm"
+                        className="w-full h-28 sm:h-32 object-cover rounded-lg border border-gray-200 shadow-sm"
                       />
                     </div>
                   )}
                 </div>
 
-                <div className="pt-4 flex justify-end gap-3 border-t border-gray-100">
+                <div className="pt-3 sm:pt-4 flex justify-end gap-2 sm:gap-3 border-t border-gray-100">
                   <button
                     type="button"
                     onClick={closeModal}
-                    className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                    className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                     disabled={isSubmitting}
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors flex items-center gap-2 shadow-sm"
+                    className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors flex items-center gap-1.5 sm:gap-2 shadow-sm"
                     disabled={isSubmitting}
                   >
                     {isSubmitting ? (
@@ -538,43 +537,42 @@ export default function StorePage() {
         </div>
       )}
 
-      {/* [PERBAIKAN]: Modal Form Gabung Toko */}
       {isJoinModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col">
-            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-bold text-amber-900">Gabung ke Toko</h2>
+            <div className="flex justify-between items-center px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
+              <h2 className="text-base sm:text-lg font-bold text-amber-900">Gabung ke Toko</h2>
               <button onClick={() => setIsJoinModalOpen(false)} className="text-gray-400 hover:text-red-500 transition-colors">
-                <i className="fa-solid fa-xmark text-xl"></i>
+                <i className="fa-solid fa-xmark text-lg sm:text-xl"></i>
               </button>
             </div>
             
-            <form onSubmit={handleJoinStore} className="p-6 space-y-4">
+            <form onSubmit={handleJoinStore} className="p-4 sm:p-6 space-y-3 sm:space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">ID Toko (UUID)</label>
+                <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1">ID Toko (UUID)</label>
                 <input
                   type="text"
                   value={joinStoreId}
                   onChange={(e) => setJoinStoreId(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-800 focus:border-amber-800 outline-none transition-all font-mono text-sm"
+                  className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-800 focus:border-amber-800 outline-none transition-all font-mono text-xs sm:text-sm"
                   placeholder="Masukkan ID unik toko..."
                   required
                 />
-                <p className="text-xs text-gray-500 mt-1">Anda bisa mendapatkan ID toko dari pemilik toko terkait.</p>
+                <p className="text-[11px] sm:text-xs text-gray-500 mt-1">Anda bisa mendapatkan ID toko dari pemilik toko terkait.</p>
               </div>
 
-              <div className="pt-2 flex justify-end gap-3 border-t border-gray-100">
+              <div className="pt-2 flex justify-end gap-2 sm:gap-3 border-t border-gray-100">
                 <button
                   type="button"
                   onClick={() => setIsJoinModalOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                   disabled={isSubmitting}
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-sm font-medium text-white bg-amber-800 hover:bg-amber-900 rounded-lg transition-colors flex items-center gap-2 shadow-sm"
+                  className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-white bg-amber-800 hover:bg-amber-900 rounded-lg transition-colors flex items-center gap-1.5 sm:gap-2 shadow-sm"
                   disabled={isSubmitting}
                 >
                   {isSubmitting ? (
@@ -590,14 +588,14 @@ export default function StorePage() {
       )}
 
       {isDeleteModalOpen && tokoToDelete && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
-            <div className="p-6 text-center">
-              <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4 text-red-600">
-                <i className="fa-solid fa-triangle-exclamation text-3xl"></i>
+            <div className="p-4 sm:p-6 text-center">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3 sm:mb-4 text-red-600">
+                <i className="fa-solid fa-triangle-exclamation text-2xl sm:text-3xl"></i>
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Konfirmasi Hapus</h3>
-              <p className="text-sm text-gray-500 mb-4">
+              <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1.5 sm:mb-2">Konfirmasi Hapus</h3>
+              <p className="text-xs sm:text-sm text-gray-500 mb-3 sm:mb-4">
                 Tindakan ini tidak dapat dibatalkan. Untuk melanjutkan, silakan ketik <span className="font-bold text-gray-800">"{tokoToDelete.nama}"</span> di bawah ini.
               </p>
               <input
@@ -605,14 +603,14 @@ export default function StorePage() {
                 value={deleteInputName}
                 onChange={(e) => setDeleteInputName(e.target.value)}
                 placeholder="Ketik nama toko..."
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition-all mb-6 text-center"
+                className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none text-xs sm:text-sm transition-all mb-4 sm:mb-6 text-center"
               />
               
-              <div className="flex gap-3">
+              <div className="flex gap-2 sm:gap-3">
                 <button
                   type="button"
                   onClick={closeDeleteModal}
-                  className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  className="flex-1 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                   disabled={isSubmitting}
                 >
                   Batal
@@ -621,7 +619,7 @@ export default function StorePage() {
                   type="button"
                   onClick={executeDelete}
                   disabled={isSubmitting || deleteInputName !== tokoToDelete.nama}
-                  className={`flex-1 px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors flex items-center justify-center gap-2 ${
+                  className={`flex-1 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-white rounded-lg transition-colors flex items-center justify-center gap-1.5 sm:gap-2 ${
                     deleteInputName === tokoToDelete.nama 
                       ? 'bg-red-600 hover:bg-red-700 shadow-sm' 
                       : 'bg-red-300 cursor-not-allowed'
@@ -640,12 +638,12 @@ export default function StorePage() {
       )}
 
       {toast && (
-        <div className="fixed bottom-6 right-6 z-[200] transition-all duration-300 ease-in-out">
-          <div className={`flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-xl text-white font-medium ${
+        <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[200] transition-all duration-300 ease-in-out">
+          <div className={`flex items-center gap-2.5 sm:gap-3 px-4 sm:px-5 py-3 sm:py-3.5 rounded-xl shadow-xl text-white font-medium ${
             toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
           }`}>
-            <i className={`fa-solid ${toast.type === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'} text-xl`}></i>
-            <span className="text-sm tracking-wide">{toast.message}</span>
+            <i className={`fa-solid ${toast.type === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'} text-lg sm:text-xl`}></i>
+            <span className="text-xs sm:text-sm tracking-wide">{toast.message}</span>
           </div>
         </div>
       )}
