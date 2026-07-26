@@ -102,7 +102,6 @@ export default function PublicStoreDetailPage() {
 
   if (loading) {
     return (
-      /* [KOMENTAR PERBAIKAN]: Penambahan penegas warna latar belakang putih dan teks gelap agar kebal dari mode gelap paksa browser */
       <div className="bg-white text-gray-800 rounded-xl shadow-sm border border-gray-200 p-8 flex flex-col items-center justify-center min-h-[400px]">
         <i className="fa-solid fa-circle-notch fa-spin text-4xl text-orange-600 mb-4"></i>
         <p className="text-gray-500 font-medium">Memuat informasi toko...</p>
@@ -115,7 +114,6 @@ export default function PublicStoreDetailPage() {
   }
 
   return (
-    /* [KOMENTAR PERBAIKAN]: Mengunci seluruh kontainer halaman utama dengan bg-white penting dan text-gray-900 di level teratas */
     <div className="space-y-6 relative p-0.5 sm:p-6 bg-white text-gray-900 min-h-screen">
       {/* Tombol Kembali ke Beranda */}
       <div className="flex items-center gap-3">
@@ -221,10 +219,15 @@ export default function PublicStoreDetailPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 bg-white">
             {produks.map((produk) => (
-              <div key={produk.id} className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all flex flex-col overflow-hidden">
-                <div className="h-48 w-full bg-white flex-shrink-0 relative cursor-pointer border-b border-gray-100" onClick={() => produk.foto && setPreviewImageUrl(produk.foto)}>
+              /* [PENYESUAIAN NAVIGASI PRODUK PUBLIK]: Mengarahkan ke /search-produk/[id] saat produk diklik */
+              <Link
+                key={produk.id}
+                href={`/search-produk/${produk.id}`}
+                className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-orange-200 transition-all flex flex-col overflow-hidden group block"
+              >
+                <div className="h-48 w-full bg-white flex-shrink-0 relative cursor-pointer border-b border-gray-100" onClick={(e) => { e.preventDefault(); produk.foto && setPreviewImageUrl(produk.foto); }}>
                   {produk.foto ? (
-                    <img src={produk.foto} alt={produk.nama} className="w-full h-full object-cover" />
+                    <img src={produk.foto} alt={produk.nama} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-300 bg-white">
                       <i className="fa-solid fa-box text-5xl text-gray-200"></i>
@@ -239,11 +242,11 @@ export default function PublicStoreDetailPage() {
                   <span className="w-fit bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider mb-2">
                     {produk.jenis_produk?.nama || 'Tanpa Jenis'}
                   </span>
-                  <h3 className="text-lg font-bold text-gray-900 leading-tight">
+                  <h3 className="text-lg font-bold text-gray-900 group-hover:text-orange-700 transition-colors leading-tight truncate">
                     {produk.nama}
                   </h3>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}
