@@ -3,7 +3,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
-// [PERBAIKAN]: Mengimpor komponen Link dari Next.js untuk navigasi ke halaman detail
 import Link from 'next/link';
 
 // Mendefinisikan struktur data untuk Kategori Toko
@@ -18,6 +17,8 @@ interface Toko {
   user_id: string;
   kategori_id: string;
   nama: string;
+  // [PERBAIKAN]: Menambahkan field deskripsi pada antarmuka Toko
+  deskripsi?: string | null;
   foto: string | null;
   kategori_toko?: {
     nama: string;
@@ -39,10 +40,10 @@ export default function StorePage() {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editId, setEditId] = useState<string | null>(null);
 
-  // [PERBAIKAN]: State untuk mengontrol dropdown aksi (titik tiga)
+  // State untuk mengontrol dropdown aksi (titik tiga)
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
-  // [PERBAIKAN]: State untuk kontrol modal konfirmasi hapus khusus
+  // State untuk kontrol modal konfirmasi hapus khusus
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
   const [tokoToDelete, setTokoToDelete] = useState<Toko | null>(null);
   const [deleteInputName, setDeleteInputName] = useState<string>('');
@@ -50,6 +51,8 @@ export default function StorePage() {
   // State data formulir
   const [formData, setFormData] = useState({
     nama: '',
+    // [PERBAIKAN]: Menambahkan deskripsi ke dalam inisialisasi state form
+    deskripsi: '',
     kategori_id: '',
     fileFoto: null as File | null,
     previewFoto: '' as string,
@@ -95,7 +98,7 @@ export default function StorePage() {
   };
 
   // Menangani perubahan nilai input form
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
@@ -118,6 +121,8 @@ export default function StorePage() {
     setEditId(null);
     setFormData({
       nama: '',
+      // [PERBAIKAN]: Mereset field deskripsi
+      deskripsi: '',
       kategori_id: '',
       fileFoto: null,
       previewFoto: '',
@@ -129,23 +134,25 @@ export default function StorePage() {
     setEditId(toko.id);
     setFormData({
       nama: toko.nama,
+      // [PERBAIKAN]: Mengisi data deskripsi untuk diedit
+      deskripsi: toko.deskripsi || '',
       kategori_id: toko.kategori_id,
       fileFoto: null,
       previewFoto: toko.foto || '',
     });
     setIsModalOpen(true);
-    setActiveDropdown(null); // Menutup dropdown saat modal edit terbuka
+    setActiveDropdown(null); 
   };
 
-  // [PERBAIKAN]: Fungsi untuk membuka modal konfirmasi hapus
+  // Fungsi untuk membuka modal konfirmasi hapus
   const openDeleteModal = (toko: Toko) => {
     setTokoToDelete(toko);
-    setDeleteInputName(''); // Reset input ketikan nama
+    setDeleteInputName(''); 
     setIsDeleteModalOpen(true);
-    setActiveDropdown(null); // Menutup dropdown saat modal hapus terbuka
+    setActiveDropdown(null); 
   };
 
-  // [PERBAIKAN]: Fungsi untuk menutup modal konfirmasi hapus
+  // Fungsi untuk menutup modal konfirmasi hapus
   const closeDeleteModal = () => {
     setIsDeleteModalOpen(false);
     setTokoToDelete(null);
@@ -195,6 +202,8 @@ export default function StorePage() {
           .from('toko')
           .update({
             nama: formData.nama,
+            // [PERBAIKAN]: Menyertakan deskripsi saat update
+            deskripsi: formData.deskripsi,
             kategori_id: formData.kategori_id,
             foto: fotoUrl,
             updated_at: new Date().toISOString(),
@@ -209,6 +218,8 @@ export default function StorePage() {
             user_id: session.user.id,
             kategori_id: formData.kategori_id,
             nama: formData.nama,
+            // [PERBAIKAN]: Menyertakan deskripsi saat insert
+            deskripsi: formData.deskripsi,
             foto: fotoUrl,
           });
 
@@ -224,7 +235,7 @@ export default function StorePage() {
     }
   };
 
-  // [PERBAIKAN]: Fungsi eksekusi hapus yang dipanggil dari dalam Modal Hapus
+  // Fungsi eksekusi hapus yang dipanggil dari dalam Modal Hapus
   const executeDelete = async () => {
     if (!tokoToDelete) return;
 
@@ -249,7 +260,7 @@ export default function StorePage() {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
       
-      {/* [PERBAIKAN]: Overlay transparan untuk menutup dropdown aksi jika mengklik di luar area dropdown */}
+      {/* Overlay transparan untuk menutup dropdown aksi jika mengklik di luar area dropdown */}
       {activeDropdown && (
         <div 
           className="fixed inset-0 z-[5]" 
@@ -259,13 +270,11 @@ export default function StorePage() {
 
       <div className="flex justify-between items-center mb-6">
         <div>
-          {/* [PERBAIKAN]: Menggunakan warna amber-900 (cokelat gelap) untuk judul */}
           <h1 className="text-2xl font-bold text-amber-900">Manajemen Toko (Store)</h1>
           <p className="text-sm text-gray-500 mt-1">Kelola data toko dan kategori Anda di sini.</p>
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          /* [PERBAIKAN]: Mengubah warna tombol menjadi perpaduan oranye tua */
           className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm"
         >
           <i className="fa-solid fa-plus"></i>
@@ -273,97 +282,104 @@ export default function StorePage() {
         </button>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="px-4 py-3 text-sm font-semibold text-gray-600">Foto</th>
-              <th className="px-4 py-3 text-sm font-semibold text-gray-600">Nama Toko</th>
-              <th className="px-4 py-3 text-sm font-semibold text-gray-600">Kategori</th>
-              <th className="px-4 py-3 text-sm font-semibold text-gray-600 text-right">Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
-                  <i className="fa-solid fa-circle-notch fa-spin text-2xl mb-2 block"></i>
-                  Memuat data...
-                </td>
-              </tr>
-            ) : tokos.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
-                  Belum ada data toko. Silakan tambahkan toko baru.
-                </td>
-              </tr>
-            ) : (
-              tokos.map((toko) => (
-                <tr key={toko.id} className="border-b border-gray-100 hover:bg-orange-50/50 transition-colors">
-                  <td className="px-4 py-3">
-                    {toko.foto ? (
-                      <img src={toko.foto} alt={toko.nama} className="w-12 h-12 rounded-lg object-cover border border-gray-200 shadow-sm" />
-                    ) : (
-                      <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 border border-gray-200">
-                        <i className="fa-solid fa-image"></i>
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 font-medium text-amber-900">
-                    {/* [PERBAIKAN]: Nama toko dibungkus Link agar bisa diklik menuju detail, dengan efek underline saat di-hover */}
-                    <Link href={`/store/${toko.id}`} className="hover:underline hover:text-orange-700 transition-all cursor-pointer">
-                      {toko.nama}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {/* [PERBAIKAN]: Mengubah badge kategori menjadi warna oranye lembut */}
-                    <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-xs font-semibold">
+      {/* [PERBAIKAN]: Mengubah tampilan dari Tabel menjadi Grid Card */}
+      {loading ? (
+        <div className="text-center py-12 text-gray-500">
+          <i className="fa-solid fa-circle-notch fa-spin text-3xl mb-3 block text-orange-600"></i>
+          Memuat data toko...
+        </div>
+      ) : tokos.length === 0 ? (
+        <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+          <i className="fa-solid fa-store-slash text-4xl mb-3 text-gray-400"></i>
+          <p>Belum ada data toko. Silakan tambahkan toko baru.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {tokos.map((toko) => (
+            <div key={toko.id} className="relative bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-orange-200 transition-all group flex flex-col overflow-hidden">
+              
+              {/* [PERBAIKAN]: Area Aksi (Dropdown) ditempatkan secara absolut (mengambang) agar tidak memicu navigasi Link */}
+              <div className="absolute top-3 right-3 z-10">
+                <div className="relative inline-block text-left">
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault(); // Mencegah klik menyebar ke Link
+                      e.stopPropagation();
+                      setActiveDropdown(activeDropdown === toko.id ? null : toko.id);
+                    }}
+                    className="w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm text-gray-600 hover:bg-orange-100 hover:text-orange-700 flex items-center justify-center transition-colors shadow-sm border border-gray-100"
+                    title="Aksi"
+                  >
+                    <i className="fa-solid fa-ellipsis-vertical"></i>
+                  </button>
+
+                  {/* Konten Dropdown */}
+                  {activeDropdown === toko.id && (
+                    <div className="absolute right-0 mt-2 w-32 bg-white rounded-md shadow-lg border border-gray-200 z-20 py-1">
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          openEditModal(toko);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 flex items-center gap-2 transition-colors"
+                      >
+                        <i className="fa-solid fa-pen-to-square w-4"></i> Edit
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          openDeleteModal(toko);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                      >
+                        <i className="fa-solid fa-trash w-4"></i> Hapus
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* [PERBAIKAN]: Sisa Card dibungkus dengan Link sehingga seluruh card dapat diklik untuk ke halaman detail */}
+              <Link href={`/store/${toko.id}`} className="flex flex-col flex-grow outline-none focus:ring-2 focus:ring-orange-500 rounded-xl">
+                {/* Bagian Foto */}
+                <div className="h-48 w-full bg-gray-100 flex-shrink-0 relative">
+                  {toko.foto ? (
+                    <img src={toko.foto} alt={toko.nama} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-300">
+                      <i className="fa-solid fa-image text-5xl"></i>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Bagian Konten Teks */}
+                <div className="p-5 flex flex-col flex-grow">
+                  <div className="flex flex-col gap-1 mb-3">
+                    <span className="w-fit bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
                       {toko.kategori_toko?.nama || 'Tanpa Kategori'}
                     </span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    
-                    {/* [PERBAIKAN]: Menu aksi diubah menjadi titik tiga dengan dropdown */}
-                    <div className="relative inline-block text-left z-10">
-                      <button
-                        onClick={() => setActiveDropdown(activeDropdown === toko.id ? null : toko.id)}
-                        className="w-8 h-8 rounded-lg text-gray-500 hover:bg-orange-100 hover:text-orange-700 flex items-center justify-center transition-colors"
-                        title="Aksi"
-                      >
-                        <i className="fa-solid fa-ellipsis-vertical"></i>
-                      </button>
-
-                      {/* Konten Dropdown */}
-                      {activeDropdown === toko.id && (
-                        <div className="absolute right-0 mt-2 w-32 bg-white rounded-md shadow-lg border border-gray-200 z-20 py-1">
-                          <button
-                            onClick={() => openEditModal(toko)}
-                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 flex items-center gap-2 transition-colors"
-                          >
-                            <i className="fa-solid fa-pen-to-square w-4"></i> Edit
-                          </button>
-                          <button
-                            onClick={() => openDeleteModal(toko)}
-                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
-                          >
-                            <i className="fa-solid fa-trash w-4"></i> Hapus
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+                    <h3 className="text-lg font-bold text-amber-900 group-hover:text-orange-700 transition-colors line-clamp-1">
+                      {toko.nama}
+                    </h3>
+                  </div>
+                  
+                  {/* [PERBAIKAN]: Menampilkan sebagian teks deskripsi pada card */}
+                  <p className="text-sm text-gray-500 line-clamp-3 leading-relaxed">
+                    {toko.deskripsi ? toko.deskripsi : <span className="italic">Tidak ada deskripsi.</span>}
+                  </p>
+                </div>
+              </Link>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Modal Form Tambah/Edit Toko */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
             <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
               <h2 className="text-lg font-bold text-amber-900">
                 {editId ? 'Edit Data Toko' : 'Tambah Toko Baru'}
@@ -373,87 +389,99 @@ export default function StorePage() {
               </button>
             </div>
             
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Nama Toko</label>
-                <input
-                  type="text"
-                  name="nama"
-                  value={formData.nama}
-                  onChange={handleInputChange}
-                  /* [PERBAIKAN]: Fokus input diubah menjadi oranye */
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
-                  placeholder="Masukkan nama toko"
-                  required
-                />
-              </div>
+            <div className="overflow-y-auto">
+              <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Nama Toko</label>
+                  <input
+                    type="text"
+                    name="nama"
+                    value={formData.nama}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all"
+                    placeholder="Masukkan nama toko"
+                    required
+                  />
+                </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Kategori Toko</label>
-                <select
-                  name="kategori_id"
-                  value={formData.kategori_id}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all bg-white"
-                  required
-                >
-                  <option value="" disabled>-- Pilih Kategori --</option>
-                  {kategoris.map((kategori) => (
-                    <option key={kategori.id} value={kategori.id}>
-                      {kategori.nama}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Kategori Toko</label>
+                  <select
+                    name="kategori_id"
+                    value={formData.kategori_id}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all bg-white"
+                    required
+                  >
+                    <option value="" disabled>-- Pilih Kategori --</option>
+                    {kategoris.map((kategori) => (
+                      <option key={kategori.id} value={kategori.id}>
+                        {kategori.nama}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Foto Toko</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  /* [PERBAIKAN]: Warna file input disesuaikan dengan tema oranye/cokelat */
-                  className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 transition-colors"
-                />
-                {formData.previewFoto && (
-                  <div className="mt-3">
-                    <img
-                      src={formData.previewFoto}
-                      alt="Pratinjau"
-                      className="w-full h-32 object-cover rounded-lg border border-gray-200 shadow-sm"
-                    />
-                  </div>
-                )}
-              </div>
+                {/* [PERBAIKAN]: Menambahkan Textarea untuk input Deskripsi */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Deskripsi Toko (Opsional)</label>
+                  <textarea
+                    name="deskripsi"
+                    value={formData.deskripsi}
+                    onChange={handleInputChange}
+                    rows={3}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none transition-all resize-none"
+                    placeholder="Tuliskan deksripsi singkat toko..."
+                  ></textarea>
+                </div>
 
-              <div className="pt-4 flex justify-end gap-3 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                  disabled={isSubmitting}
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  /* [PERBAIKAN]: Tombol simpan menggunakan tema oranye */
-                  className="px-4 py-2 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors flex items-center gap-2 shadow-sm"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <><i className="fa-solid fa-circle-notch fa-spin"></i> Menyimpan...</>
-                  ) : (
-                    <><i className="fa-solid fa-save"></i> Simpan Data</>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Foto Toko</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 transition-colors"
+                  />
+                  {formData.previewFoto && (
+                    <div className="mt-3">
+                      <img
+                        src={formData.previewFoto}
+                        alt="Pratinjau"
+                        className="w-full h-32 object-cover rounded-lg border border-gray-200 shadow-sm"
+                      />
+                    </div>
                   )}
-                </button>
-              </div>
-            </form>
+                </div>
+
+                <div className="pt-4 flex justify-end gap-3 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                    disabled={isSubmitting}
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors flex items-center gap-2 shadow-sm"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <><i className="fa-solid fa-circle-notch fa-spin"></i> Menyimpan...</>
+                    ) : (
+                      <><i className="fa-solid fa-save"></i> Simpan Data</>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
 
-      {/* [PERBAIKAN]: Modal Konfirmasi Hapus Khusus dengan Pengetikan Nama */}
+      {/* Modal Konfirmasi Hapus Khusus dengan Pengetikan Nama */}
       {isDeleteModalOpen && tokoToDelete && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
@@ -485,7 +513,6 @@ export default function StorePage() {
                 <button
                   type="button"
                   onClick={executeDelete}
-                  /* Tombol hanya aktif jika ketikan pengguna sama persis dengan nama toko */
                   disabled={isSubmitting || deleteInputName !== tokoToDelete.nama}
                   className={`flex-1 px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors flex items-center justify-center gap-2 ${
                     deleteInputName === tokoToDelete.nama 
