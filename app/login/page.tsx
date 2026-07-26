@@ -1,10 +1,12 @@
+// app/login/page.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 
-export default function LoginPage() {
+// [PERBAIKAN]: Komponen internal untuk menangani logika halaman login yang menggunakan useSearchParams
+function LoginForm() {
   const router = useRouter();
   
   const searchParams = useSearchParams();
@@ -13,7 +15,6 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-
   const handleGoogleLogin = async () => {
     setError('');
     setLoading(true);
@@ -21,7 +22,6 @@ export default function LoginPage() {
     try {
       const supabase = createClient();
 
-  
       const redirectOrigin = window.location.origin;
       const callbackUrl = `${redirectOrigin}/api/auth/callback?next=${encodeURIComponent(nextUrl)}`;
 
@@ -83,5 +83,18 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4">
+        <div className="text-gray-500 font-medium">Memuat halaman masuk...</div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }
