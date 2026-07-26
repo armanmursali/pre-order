@@ -14,6 +14,10 @@ interface TokoDetail {
   deskripsi?: string | null;
   foto: string | null;
   created_at: string;
+  telepon?: string | null;
+  alamat?: string | null;
+  rekening?: string | null;
+  metode_pembayaran?: string | null;
   anggota?: any[]; 
   kategori_toko?: {
     nama: string;
@@ -61,6 +65,15 @@ export default function StoreDetailPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
   const [productToDelete, setProductToDelete] = useState<Produk | null>(null);
   const [deleteInputName, setDeleteInputName] = useState<string>('');
+
+  // State Modal Pengaturan Informasi Toko
+  const [isStoreSettingsModalOpen, setIsStoreSettingsModalOpen] = useState<boolean>(false);
+  const [storeSettingsForm, setStoreSettingsForm] = useState({
+    telepon: '',
+    alamat: '',
+    rekening: '',
+    metode_pembayaran: 'Tunai & Transfer',
+  });
 
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -188,6 +201,14 @@ export default function StoreDetailPage() {
 
       setToko({ ...dataToko, anggota: listAnggota });
 
+      // Sinkronisasi data ke state form pengaturan toko
+      setStoreSettingsForm({
+        telepon: dataToko.telepon || '',
+        alamat: dataToko.alamat || '',
+        rekening: dataToko.rekening || '',
+        metode_pembayaran: dataToko.metode_pembayaran || 'Tunai & Transfer',
+      });
+
       const { data: dataJenis } = await supabase
         .from('jenis_produk')
         .select('*')
@@ -210,6 +231,36 @@ export default function StoreDetailPage() {
     }
   };
 
+  // [FUNGSI KELOLA INFORMASI TOKO]: Menyimpan perubahan telepon, alamat, rekening, dan metode pembayaran
+  const handleStoreSettingsSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!toko) return;
+
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from('toko')
+        .update({
+          telepon: storeSettingsForm.telepon,
+          alamat: storeSettingsForm.alamat,
+          rekening: storeSettingsForm.rekening,
+          metode_pembayaran: storeSettingsForm.metode_pembayaran,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', toko.id);
+
+      if (error) throw error;
+
+      showToast('Informasi detail toko berhasil diperbarui!', 'success');
+      setIsStoreSettingsModalOpen(false);
+      fetchAllData(toko.id);
+    } catch (error: any) {
+      showToast('Gagal memperbarui informasi toko: ' + error.message, 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // [LOGIKA STATUS ANGGOTA + TOLAK]: Menerima, menolak, ubah jadi pemilik, atau keluar/keluarkan
   const handleUpdateAnggotaStatus = async (targetUserId: string, actionType: string) => {
     if (!toko) return;
@@ -221,7 +272,6 @@ export default function StoreDetailPage() {
       let updatedAnggota = [...currentAnggota];
 
       if (actionType === 'tolak') {
-        // Hapus user dari list karena ditolak
         updatedAnggota = updatedAnggota.filter((m: any) => m.user_id !== targetUserId);
         
         const { error } = await supabase
@@ -269,7 +319,6 @@ export default function StoreDetailPage() {
 
         showToast(actionType === 'keluar' ? 'Anda berhasil keluar dari toko.' : 'Anggota berhasil dikeluarkan.', 'success');
       } else {
-        // Status 'tergabung' atau 'pemilik'
         updatedAnggota = updatedAnggota.map((m: any) => {
           if (m.user_id === targetUserId) {
             return { ...m, status: actionType };
@@ -506,9 +555,22 @@ export default function StoreDetailPage() {
             </button>
             <h1 className="text-lg sm:text-xl font-bold text-amber-900">Detail Toko</h1>
           </div>
-          <span className="bg-orange-100 text-orange-800 px-3 sm:px-4 py-1.5 rounded-full text-[10px] sm:text-xs font-bold tracking-wide">
-            {toko.kategori_toko?.nama || 'Tanpa Kategori'}
-          </span>
+
+          <div className="flex items-center gap-2">
+            {/* Tombol Pengaturan Informasi Toko (Hanya muncul jika user adalah pemilik) */}
+            {isOwner && (
+              <button
+                onClick={() => setIsStoreSettingsModalOpen(true)}
+                className="flex items-center gap-1.5 bg-amber-800 hover:bg-amber-900 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-sm"
+              >
+                <i className="fa-solid fa-gear"></i>
+                <span className="hidden sm:inline">Pengaturan Toko</span>
+              </button>
+            )}
+            <span className="bg-orange-100 text-orange-800 px-3 sm:px-4 py-1.5 rounded-full text-[10px] sm:text-xs font-bold tracking-wide">
+              {toko.kategori_toko?.nama || 'Tanpa Kategori'}
+            </span>
+          </div>
         </div>
 
         <div className="p-4 sm:p-6 md:p-8 flex flex-col md:flex-row gap-6 sm:gap-8">
@@ -539,6 +601,42 @@ export default function StoreDetailPage() {
                   {toko.deskripsi ? toko.deskripsi : <span className="italic text-gray-400">Tidak ada deskripsi yang ditambahkan.</span>}
                 </p>
               </div>
+
+              {/* [INFORMASI TAMBAHAN TOKO]: Menampilkan Nomor Telepon, Alamat, Rekening, dan Metode Pembayaran */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                <div className="p-3.5 sm:p-4 bg-gray-50 rounded-xl border border-gray-100">
+                  <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Nomor Telepon</p>
+                  <p className="text-xs sm:text-sm font-medium text-gray-900 flex items-center gap-2">
+                    <i className="fa-solid fa-phone text-orange-600"></i>
+                    {toko.telepon ? toko.telepon : <span className="italic text-gray-400">Belum diatur</span>}
+                  </p>
+                </div>
+
+                <div className="p-3.5 sm:p-4 bg-gray-50 rounded-xl border border-gray-100">
+                  <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Metode Pembayaran</p>
+                  <p className="text-xs sm:text-sm font-medium text-gray-900 flex items-center gap-2">
+                    <i className="fa-solid fa-wallet text-orange-600"></i>
+                    {toko.metode_pembayaran ? toko.metode_pembayaran : <span className="italic text-gray-400">Tunai & Transfer</span>}
+                  </p>
+                </div>
+
+                <div className="p-3.5 sm:p-4 bg-gray-50 rounded-xl border border-gray-100 md:col-span-2">
+                  <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Alamat Lengkap</p>
+                  <p className="text-xs sm:text-sm font-medium text-gray-900 flex items-start gap-2">
+                    <i className="fa-solid fa-location-dot text-orange-600 mt-0.5"></i>
+                    <span>{toko.alamat ? toko.alamat : <span className="italic text-gray-400">Belum diatur</span>}</span>
+                  </p>
+                </div>
+
+                <div className="p-3.5 sm:p-4 bg-gray-50 rounded-xl border border-gray-100 md:col-span-2">
+                  <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Rekening Pembayaran (Transfer)</p>
+                  <p className="text-xs sm:text-sm font-medium text-gray-900 flex items-start gap-2">
+                    <i className="fa-solid fa-credit-card text-orange-600 mt-0.5"></i>
+                    <span className="whitespace-pre-wrap">{toko.rekening ? toko.rekening : <span className="italic text-gray-400">Belum ada informasi rekening.</span>}</span>
+                  </p>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                 <div className="p-3.5 sm:p-4 bg-gray-50 rounded-xl border border-gray-100">
                   <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Kategori Utama</p>
@@ -760,7 +858,6 @@ export default function StoreDetailPage() {
                                 >
                                   <i className="fa-solid fa-check w-4"></i> Terima
                                 </button>
-                                {/* [BARU]: Tombol Tolak dengan pesan khusus */}
                                 <button
                                   onClick={() => handleUpdateAnggotaStatus(item.user_id, 'tolak')}
                                   className="w-full text-left px-4 py-2 text-xs sm:text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors font-medium"
@@ -777,7 +874,6 @@ export default function StoreDetailPage() {
                                 <i className="fa-solid fa-user-shield w-4"></i> Ubah Jadi Pemilik
                               </button>
                             )}
-                            {/* [LOGIKA KELUAR / KELUARKAN]: Jika pemilik login, dia tidak bisa keluar dari tokonya sendiri, melainkan hanya bisa mengeluarkan anggota lain */}
                             {(!isItemOwner || !isMe) && (
                               <button
                                 onClick={() => handleUpdateAnggotaStatus(item.user_id, isMe && !isItemOwner ? 'keluar' : 'kick')}
@@ -798,7 +894,93 @@ export default function StoreDetailPage() {
         </div>
       )}
 
-      {/* Modal Tambah/Edit Produk dengan perbaikan teks input */}
+      {/* [MODAL PENGATURAN TOKO]: Form untuk mengatur nomor telepon, alamat, rekening, dan metode pembayaran */}
+      {isStoreSettingsModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-200">
+              <h2 className="text-base sm:text-lg font-bold text-amber-900">Pengaturan Informasi Toko</h2>
+              <button onClick={() => setIsStoreSettingsModalOpen(false)} className="text-gray-400 hover:text-red-500 transition-colors">
+                <i className="fa-solid fa-xmark text-lg sm:text-xl"></i>
+              </button>
+            </div>
+            
+            <div className="overflow-y-auto">
+              <form onSubmit={handleStoreSettingsSubmit} className="p-4 sm:p-6 space-y-3 sm:space-y-4">
+                <div>
+                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1">Nomor Telepon / WhatsApp</label>
+                  <input
+                    type="text"
+                    value={storeSettingsForm.telepon}
+                    onChange={(e) => setStoreSettingsForm({ ...storeSettingsForm, telepon: e.target.value })}
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-xs sm:text-sm transition-all text-gray-900 bg-white"
+                    placeholder="Contoh: 081234567890"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1">Metode Pembayaran</label>
+                  <select
+                    value={storeSettingsForm.metode_pembayaran}
+                    onChange={(e) => setStoreSettingsForm({ ...storeSettingsForm, metode_pembayaran: e.target.value })}
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-xs sm:text-sm transition-all text-gray-900 bg-white"
+                  >
+                    <option value="Tunai (Cash)">Tunai (Cash)</option>
+                    <option value="Transfer Bank">Transfer Bank</option>
+                    <option value="Tunai & Transfer">Tunai & Transfer (Keduanya)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1">Alamat Lengkap Toko</label>
+                  <textarea
+                    rows={2}
+                    value={storeSettingsForm.alamat}
+                    onChange={(e) => setStoreSettingsForm({ ...storeSettingsForm, alamat: e.target.value })}
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-xs sm:text-sm transition-all resize-none text-gray-900 bg-white"
+                    placeholder="Tuliskan alamat lengkap..."
+                  ></textarea>
+                </div>
+
+                <div>
+                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1">Rekening Pembayaran (Untuk Transfer)</label>
+                  <textarea
+                    rows={3}
+                    value={storeSettingsForm.rekening}
+                    onChange={(e) => setStoreSettingsForm({ ...storeSettingsForm, rekening: e.target.value })}
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-xs sm:text-sm transition-all resize-none text-gray-900 bg-white font-mono"
+                    placeholder="Contoh: BCA 1234567890 a.n Nama Pemilik"
+                  ></textarea>
+                </div>
+
+                <div className="pt-3 sm:pt-4 flex justify-end gap-2 sm:gap-3 border-t border-gray-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsStoreSettingsModalOpen(false)}
+                    className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                    disabled={isSubmitting}
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-white bg-amber-800 hover:bg-amber-900 rounded-lg transition-colors flex items-center gap-1.5 sm:gap-2 shadow-sm"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <><i className="fa-solid fa-circle-notch fa-spin"></i> Menyimpan...</>
+                    ) : (
+                      <><i className="fa-solid fa-save"></i> Simpan Pengaturan</>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Tambah/Edit Produk */}
       {isProductModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
@@ -904,7 +1086,7 @@ export default function StoreDetailPage() {
         </div>
       )}
 
-      {/* Modal Hapus Produk dengan perbaikan teks input */}
+      {/* Modal Hapus Produk */}
       {isDeleteModalOpen && productToDelete && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
