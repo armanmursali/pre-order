@@ -10,6 +10,8 @@ import Link from 'next/link';
 interface TokoDetail {
   id: string;
   nama: string;
+  // [PERBAIKAN]: Menambahkan field deskripsi pada struktur data
+  deskripsi?: string | null;
   foto: string | null;
   created_at: string;
   kategori_toko?: {
@@ -140,6 +142,15 @@ export default function StoreDetailPage() {
           </p>
 
           <div className="space-y-4">
+            
+            {/* [PERBAIKAN]: Menambahkan blok khusus untuk menampilkan Deskripsi Toko */}
+            <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Deskripsi Toko</p>
+              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                {toko.deskripsi ? toko.deskripsi : <span className="italic text-gray-400">Tidak ada deskripsi yang ditambahkan.</span>}
+              </p>
+            </div>
+
             <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Kategori Utama</p>
               <p className="text-base font-medium text-gray-900">{toko.kategori_toko?.nama || '-'}</p>
