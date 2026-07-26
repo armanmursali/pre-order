@@ -28,7 +28,11 @@ interface ProdukDetail {
 }
 
 export default function PublicProductDetailPage() {
-  const params = useParams<{ id: string }>();
+  const params = useParams();
+  // Memastikan ekstraksi ID aman dari tipe data array/string rute dinamis Next.js
+  const rawId = params?.id;
+  const productId = Array.isArray(rawId) ? rawId[0] : rawId;
+
   const router = useRouter();
   const supabase = createClient();
 
@@ -38,10 +42,10 @@ export default function PublicProductDetailPage() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
-    if (params?.id) {
-      fetchPublicProductData(params.id);
+    if (productId) {
+      fetchPublicProductData(productId);
     }
-  }, [params?.id]);
+  }, [productId]);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
@@ -57,14 +61,14 @@ export default function PublicProductDetailPage() {
   };
 
   // [FUNGSI AMBIL DATA PRODUK PUBLIK]: Mengambil detail produk beserta informasi toko pemiliknya
-  const fetchPublicProductData = async (productId: string) => {
+  const fetchPublicProductData = async (targetId: string) => {
     try {
       setLoading(true);
 
       const { data: dataProduk, error: errorProduk } = await supabase
         .from('produk')
         .select('*, jenis_produk(nama), toko:toko_id(id, user_id, nama, telepon, alamat, rekening, metode_pembayaran)')
-        .eq('id', productId)
+        .eq('id', targetId)
         .single();
 
       if (errorProduk || !dataProduk) {
