@@ -41,28 +41,25 @@ export default function StoreDetailPage() {
   const router = useRouter();
   const supabase = createClient();
 
-
   const [toko, setToko] = useState<TokoDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-
 
   const [produks, setProduks] = useState<Produk[]>([]);
   const [jenisProduks, setJenisProduks] = useState<JenisProduk[]>([]);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   
-
   const [isProductModalOpen, setIsProductModalOpen] = useState<boolean>(false);
   const [editProductId, setEditProductId] = useState<string | null>(null);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-
 
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
   const [productToDelete, setProductToDelete] = useState<Produk | null>(null);
   const [deleteInputName, setDeleteInputName] = useState<string>('');
 
+  // [PERBAIKAN]: State untuk kontrol Modal Preview Gambar Produk
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-
 
   const [productFormData, setProductFormData] = useState({
     nama: '',
@@ -72,12 +69,10 @@ export default function StoreDetailPage() {
     previewFoto: '' as string,
   });
 
-
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
-
 
   const formatRupiah = (angka: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -93,12 +88,10 @@ export default function StoreDetailPage() {
     }
   }, [params?.id]);
 
-  
   const fetchAllData = async (tokoId: string) => {
     try {
       setLoading(true);
       
-
       const { data: dataToko, error: errorToko } = await supabase
         .from('toko')
         .select('*, kategori_toko(nama)')
@@ -108,7 +101,6 @@ export default function StoreDetailPage() {
       if (errorToko) console.error('Gagal memuat detail toko:', errorToko.message);
       else if (dataToko) setToko(dataToko);
 
-
       const { data: dataJenis, error: errorJenis } = await supabase
         .from('jenis_produk')
         .select('*')
@@ -116,7 +108,6 @@ export default function StoreDetailPage() {
 
       if (errorJenis) console.error('Gagal memuat jenis produk:', errorJenis.message);
       else if (dataJenis) setJenisProduks(dataJenis);
-
 
       const { data: dataProduk, error: errorProduk } = await supabase
         .from('produk')
@@ -134,7 +125,6 @@ export default function StoreDetailPage() {
     }
   };
 
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setProductFormData((prev) => ({ ...prev, [name]: value }));
@@ -151,7 +141,6 @@ export default function StoreDetailPage() {
     }
   };
 
-
   const closeProductModal = () => {
     setIsProductModalOpen(false);
     setEditProductId(null);
@@ -163,7 +152,6 @@ export default function StoreDetailPage() {
       previewFoto: '',
     });
   };
-
 
   const openEditProductModal = (produk: Produk) => {
     setEditProductId(produk.id);
@@ -178,7 +166,6 @@ export default function StoreDetailPage() {
     setActiveDropdown(null);
   };
 
-
   const openDeleteModal = (produk: Produk) => {
     setProductToDelete(produk);
     setDeleteInputName('');
@@ -192,7 +179,6 @@ export default function StoreDetailPage() {
     setDeleteInputName('');
   };
 
- 
   const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -206,7 +192,6 @@ export default function StoreDetailPage() {
     try {
       let fotoUrl = productFormData.previewFoto;
 
-     
       if (productFormData.fileFoto) {
         const fileExt = productFormData.fileFoto.name.split('.').pop();
         const fileName = `prod-${Date.now()}.${fileExt}`;
@@ -265,7 +250,6 @@ export default function StoreDetailPage() {
     }
   };
 
- 
   const executeDeleteProduct = async () => {
     if (!productToDelete) return;
 
@@ -318,7 +302,6 @@ export default function StoreDetailPage() {
   return (
     <div className="space-y-6 relative">
       
-     
       {activeDropdown && (
         <div 
           className="fixed inset-0 z-[5]" 
@@ -326,7 +309,7 @@ export default function StoreDetailPage() {
         />
       )}
 
-     
+    
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-orange-50/30">
           <div className="flex items-center gap-3">
@@ -346,7 +329,7 @@ export default function StoreDetailPage() {
 
         <div className="p-6 md:p-8 flex flex-col md:flex-row gap-8">
           <div className="w-full md:w-1/3 flex-shrink-0">
-            <div className="aspect-square rounded-2xl overflow-hidden border-2 border-gray-100 shadow-sm bg-gray-50 flex items-center justify-center">
+            <div className="aspect-square rounded-2xl overflow-hidden border-2 border-gray-100 shadow-sm bg-gray-50 flex items-center justify-center cursor-pointer" onClick={() => toko.foto && setPreviewImageUrl(toko.foto)}>
               {toko.foto ? (
                 <img src={toko.foto} alt={toko.nama} className="w-full h-full object-cover" />
               ) : (
@@ -409,16 +392,96 @@ export default function StoreDetailPage() {
             <p>Toko ini belum memiliki produk. Silakan tambahkan produk baru.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {produks.map((produk) => (
-              <div key={produk.id} className="relative bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all group flex flex-col overflow-hidden">
-                
-              
-                <div className="absolute top-3 right-3 z-10">
-                  <div className="relative inline-block text-left">
+          <>
+          
+            <div className="hidden md:grid grid-cols-2 lg:grid-cols-3 gap-6">
+              {produks.map((produk) => (
+                <div key={produk.id} className="relative bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all group flex flex-col overflow-hidden">
+                  
+                  <div className="absolute top-3 right-3 z-10">
+                    <div className="relative inline-block text-left">
+                      <button
+                        onClick={() => setActiveDropdown(activeDropdown === produk.id ? null : produk.id)}
+                        className="w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm text-gray-600 hover:bg-orange-100 hover:text-orange-700 flex items-center justify-center transition-colors shadow-sm border border-gray-100"
+                      >
+                        <i className="fa-solid fa-ellipsis-vertical"></i>
+                      </button>
+
+                      {activeDropdown === produk.id && (
+                        <div className="absolute right-0 mt-2 w-32 bg-white rounded-md shadow-lg border border-gray-200 z-20 py-1">
+                          <button
+                            onClick={() => openEditProductModal(produk)}
+                            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 flex items-center gap-2 transition-colors"
+                          >
+                            <i className="fa-solid fa-pen-to-square w-4"></i> Edit
+                          </button>
+                          <button
+                            onClick={() => openDeleteModal(produk)}
+                            className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                          >
+                            <i className="fa-solid fa-trash w-4"></i> Hapus
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+               
+                  <div className="h-48 w-full bg-gray-100 flex-shrink-0 relative cursor-pointer" onClick={() => produk.foto && setPreviewImageUrl(produk.foto)}>
+                    {produk.foto ? (
+                      <img src={produk.foto} alt={produk.nama} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-300">
+                        <i className="fa-solid fa-box text-5xl"></i>
+                      </div>
+                    )}
+                    <div className="absolute bottom-3 left-3 bg-amber-900/90 backdrop-blur-sm text-white px-3 py-1 rounded-lg font-bold shadow-sm">
+                      {formatRupiah(produk.harga)}
+                    </div>
+                  </div>
+                  
+                  <div className="p-5 flex flex-col flex-grow">
+                    <span className="w-fit bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider mb-2">
+                      {produk.jenis_produk?.nama || 'Tanpa Jenis'}
+                    </span>
+                    <h3 className="text-lg font-bold text-gray-900 leading-tight">
+                      {produk.nama}
+                    </h3>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+        
+            <div className="md:hidden divide-y divide-gray-100">
+              {produks.map((produk) => (
+                <div key={produk.id} className="py-4 flex items-center justify-between gap-3 relative">
+                  <div className="flex items-center gap-3 overflow-hidden">
+                  
+                    <div className="w-14 h-14 bg-gray-100 rounded-xl flex-shrink-0 overflow-hidden cursor-pointer border border-gray-200" onClick={() => produk.foto && setPreviewImageUrl(produk.foto)}>
+                      {produk.foto ? (
+                        <img src={produk.foto} alt={produk.nama} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-400">
+                          <i className="fa-solid fa-box text-lg"></i>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col truncate">
+                      <span className="text-[10px] font-bold text-orange-700 bg-orange-50 px-2 py-0.5 rounded w-fit mb-1">
+                        {produk.jenis_produk?.nama || 'Tanpa Jenis'}
+                      </span>
+                      <h4 className="font-bold text-gray-900 text-sm truncate">{produk.nama}</h4>
+                      <span className="text-xs font-semibold text-amber-900 mt-0.5">{formatRupiah(produk.harga)}</span>
+                    </div>
+                  </div>
+
+               
+                  <div className="flex-shrink-0 relative">
                     <button
                       onClick={() => setActiveDropdown(activeDropdown === produk.id ? null : produk.id)}
-                      className="w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm text-gray-600 hover:bg-orange-100 hover:text-orange-700 flex items-center justify-center transition-colors shadow-sm border border-gray-100"
+                      className="w-8 h-8 rounded-full text-gray-500 hover:bg-gray-100 flex items-center justify-center transition-colors"
                     >
                       <i className="fa-solid fa-ellipsis-vertical"></i>
                     </button>
@@ -441,33 +504,9 @@ export default function StoreDetailPage() {
                     )}
                   </div>
                 </div>
-
-              
-                <div className="h-48 w-full bg-gray-100 flex-shrink-0 relative">
-                  {produk.foto ? (
-                    <img src={produk.foto} alt={produk.nama} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-300">
-                      <i className="fa-solid fa-box text-5xl"></i>
-                    </div>
-                  )}
-                 
-                  <div className="absolute bottom-3 left-3 bg-amber-900/90 backdrop-blur-sm text-white px-3 py-1 rounded-lg font-bold shadow-sm">
-                    {formatRupiah(produk.harga)}
-                  </div>
-                </div>
-                
-                <div className="p-5 flex flex-col flex-grow">
-                  <span className="w-fit bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider mb-2">
-                    {produk.jenis_produk?.nama || 'Tanpa Jenis'}
-                  </span>
-                  <h3 className="text-lg font-bold text-gray-900 leading-tight">
-                    {produk.nama}
-                  </h3>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
 
@@ -577,7 +616,7 @@ export default function StoreDetailPage() {
         </div>
       )}
 
-     
+
       {isDeleteModalOpen && productToDelete && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
@@ -628,7 +667,27 @@ export default function StoreDetailPage() {
         </div>
       )}
 
-     
+   
+      {previewImageUrl && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md" onClick={() => setPreviewImageUrl(null)}>
+          <div className="relative max-w-4xl w-full max-h-[90vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setPreviewImageUrl(null)}
+              className="absolute -top-12 right-0 text-white hover:text-orange-400 transition-colors text-3xl font-bold"
+              title="Tutup"
+            >
+              <i className="fa-solid fa-xmark"></i>
+            </button>
+            <img
+              src={previewImageUrl}
+              alt="Pratinjau Penuh"
+              className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl border border-gray-700"
+            />
+          </div>
+        </div>
+      )}
+
+   
       {toast && (
         <div className="fixed bottom-6 right-6 z-[200] transition-all duration-300 ease-in-out">
           <div className={`flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-xl text-white font-medium ${
