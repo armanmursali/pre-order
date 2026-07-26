@@ -5,7 +5,6 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
-// [BARU]: Mengimpor helper notifikasi untuk mengirim pemberitahuan ke anggota terkait
 import { sendNotification } from '@/utils/notificationHelper';
 
 interface TokoDetail {
@@ -74,6 +73,43 @@ export default function StoreDetailPage() {
     previewFoto: '' as string,
   });
 
+  // [REALTIME DETAIL TOKO]: Mendengarkan perubahan data toko secara langsung tanpa reload halaman
+  useEffect(() => {
+    let channel: any;
+
+    const initRealtimeDetail = async () => {
+      if (!params?.id) return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      fetchAllData(params.id);
+
+      channel = supabase
+        .channel(`realtime-store-detail-${params.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'toko',
+            filter: `id=eq.${params.id}`,
+          },
+          () => {
+            fetchAllData(params.id);
+          }
+        )
+        .subscribe();
+    };
+
+    initRealtimeDetail();
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [params?.id]);
+
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
@@ -92,15 +128,8 @@ export default function StoreDetailPage() {
     showToast('ID Toko berhasil disalin ke clipboard!', 'success');
   };
 
-  useEffect(() => {
-    if (params?.id) {
-      fetchAllData(params.id);
-    }
-  }, [params?.id]);
-
   const fetchAllData = async (tokoId: string) => {
     try {
-      setLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) {
         router.push('/login');
@@ -181,8 +210,8 @@ export default function StoreDetailPage() {
     }
   };
 
-  // [LOGIKA MANAJEMEN ANGGOTA + PENGIRIMAN NOTIFIKASI KE USER]: Mengatur status & mengirim notifikasi real-time
-  const handleUpdateAnggotaStatus = async (targetUserId: string, newStatus: string) => {
+  // [LOGIKA STATUS ANGGOTA + TOLAK]: Menerima, menolak, ubah jadi pemilik, atau keluar/keluarkan
+  const handleUpdateAnggotaStatus = async (targetUserId: string, actionType: string) => {
     if (!toko) return;
     try {
       setIsSubmitting(true);
@@ -191,7 +220,25 @@ export default function StoreDetailPage() {
       const currentAnggota = Array.isArray(toko.anggota) ? toko.anggota : [];
       let updatedAnggota = [...currentAnggota];
 
-      if (newStatus === 'keluar' || newStatus === 'kick') {
+      if (actionType === 'tolak') {
+        // Hapus user dari list karena ditolak
+        updatedAnggota = updatedAnggota.filter((m: any) => m.user_id !== targetUserId);
+        
+        const { error } = await supabase
+          .from('toko')
+          .update({ anggota: updatedAnggota })
+          .eq('id', toko.id);
+
+        if (error) throw error;
+
+        await sendNotification(
+          targetUserId,
+          'Permintaan Ditolak',
+          `Mohon maaf, permintaan Anda untuk bergabung ke toko "${toko.nama}" telah ditolak.`
+        );
+
+        showToast('Pengajuan gabung berhasil ditolak.', 'success');
+      } else if (actionType === 'keluar' || actionType === 'kick') {
         updatedAnggota = updatedAnggota.filter((m: any) => m.user_id !== targetUserId);
 
         let updatePayload: any = { anggota: updatedAnggota };
@@ -212,18 +259,20 @@ export default function StoreDetailPage() {
 
         if (error) throw error;
 
-        // [BARU]: Kirim notifikasi jika di-kick oleh pemilik
-        if (newStatus === 'kick') {
+        if (actionType === 'kick') {
           await sendNotification(
             targetUserId,
-            'Keluar dari Toko',
+            'Dikeluarkan dari Toko',
             `Anda telah dikeluarkan dari toko "${toko.nama}".`
           );
         }
+
+        showToast(actionType === 'keluar' ? 'Anda berhasil keluar dari toko.' : 'Anggota berhasil dikeluarkan.', 'success');
       } else {
+        // Status 'tergabung' atau 'pemilik'
         updatedAnggota = updatedAnggota.map((m: any) => {
           if (m.user_id === targetUserId) {
-            return { ...m, status: newStatus };
+            return { ...m, status: actionType };
           }
           return m;
         });
@@ -235,34 +284,29 @@ export default function StoreDetailPage() {
 
         if (error) throw error;
 
-        // [BARU]: Kirim notifikasi saat diterima atau dijadikan pemilik
-        if (newStatus === 'tergabung') {
+        if (actionType === 'tergabung') {
           await sendNotification(
             targetUserId,
             'Bergabung Diterima',
             `Permintaan Anda untuk bergabung ke toko "${toko.nama}" telah disetujui!`
           );
-        } else if (newStatus === 'pemilik') {
+        } else if (actionType === 'pemilik') {
           await sendNotification(
             targetUserId,
             'Hak Akses Diperbarui',
             `Anda sekarang telah diangkat menjadi Pemilik di toko "${toko.nama}".`
           );
         }
+
+        showToast(
+          actionType === 'pemilik' 
+            ? 'Anggota berhasil diubah menjadi Pemilik toko!' 
+            : 'Status anggota berhasil diperbarui menjadi Tergabung!', 
+          'success'
+        );
       }
 
-      showToast(
-        newStatus === 'keluar' 
-          ? 'Anda berhasil keluar dari toko.' 
-          : newStatus === 'kick' 
-          ? 'Anggota berhasil dikeluarkan dan kehilangan akses toko.' 
-          : newStatus === 'pemilik' 
-          ? 'Anggota berhasil diubah menjadi Pemilik toko!' 
-          : 'Status anggota berhasil diperbarui menjadi Tergabung!', 
-        'success'
-      );
-
-      if (newStatus === 'keluar' || (newStatus === 'kick' && targetUserId === currentUserId)) {
+      if (actionType === 'keluar' || (actionType === 'kick' && targetUserId === currentUserId)) {
         router.push('/store');
       } else {
         fetchAllData(toko.id);
@@ -676,6 +720,7 @@ export default function StoreDetailPage() {
               ) : (
                 listAnggota.map((item: any) => {
                   const isMe = item.user_id === currentUserId;
+                  const isItemOwner = item.status === 'pemilik';
 
                   return (
                     <div key={item.user_id} className="py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative">
@@ -708,14 +753,23 @@ export default function StoreDetailPage() {
                         {activeMemberDropdown === item.user_id && (
                           <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-xl border border-gray-200 z-50 py-1">
                             {item.status === 'pending' && (
-                              <button
-                                onClick={() => handleUpdateAnggotaStatus(item.user_id, 'tergabung')}
-                                className="w-full text-left px-4 py-2 text-xs sm:text-sm text-green-700 hover:bg-green-50 flex items-center gap-2 transition-colors font-medium"
-                              >
-                                <i className="fa-solid fa-check w-4"></i> Terima
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => handleUpdateAnggotaStatus(item.user_id, 'tergabung')}
+                                  className="w-full text-left px-4 py-2 text-xs sm:text-sm text-green-700 hover:bg-green-50 flex items-center gap-2 transition-colors font-medium"
+                                >
+                                  <i className="fa-solid fa-check w-4"></i> Terima
+                                </button>
+                                {/* [BARU]: Tombol Tolak dengan pesan khusus */}
+                                <button
+                                  onClick={() => handleUpdateAnggotaStatus(item.user_id, 'tolak')}
+                                  className="w-full text-left px-4 py-2 text-xs sm:text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors font-medium"
+                                >
+                                  <i className="fa-solid fa-xmark w-4"></i> Tolak
+                                </button>
+                              </>
                             )}
-                            {item.status !== 'pemilik' && (
+                            {!isItemOwner && (
                               <button
                                 onClick={() => handleUpdateAnggotaStatus(item.user_id, 'pemilik')}
                                 className="w-full text-left px-4 py-2 text-xs sm:text-sm text-amber-800 hover:bg-amber-50 flex items-center gap-2 transition-colors font-medium"
@@ -723,12 +777,15 @@ export default function StoreDetailPage() {
                                 <i className="fa-solid fa-user-shield w-4"></i> Ubah Jadi Pemilik
                               </button>
                             )}
-                            <button
-                              onClick={() => handleUpdateAnggotaStatus(item.user_id, isMe ? 'keluar' : 'kick')}
-                              className="w-full text-left px-4 py-2 text-xs sm:text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors font-medium"
-                            >
-                              <i className="fa-solid fa-user-slash w-4"></i> {isMe ? 'Keluar' : 'Keluarkan'}
-                            </button>
+                            {/* [LOGIKA KELUAR / KELUARKAN]: Jika pemilik login, dia tidak bisa keluar dari tokonya sendiri, melainkan hanya bisa mengeluarkan anggota lain */}
+                            {(!isItemOwner || !isMe) && (
+                              <button
+                                onClick={() => handleUpdateAnggotaStatus(item.user_id, isMe && !isItemOwner ? 'keluar' : 'kick')}
+                                className="w-full text-left px-4 py-2 text-xs sm:text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors font-medium"
+                              >
+                                <i className="fa-solid fa-user-slash w-4"></i> {isMe && !isItemOwner ? 'Keluar' : 'Keluarkan'}
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -741,7 +798,7 @@ export default function StoreDetailPage() {
         </div>
       )}
 
-      {/* Modal Tambah/Edit Produk */}
+      {/* Modal Tambah/Edit Produk dengan perbaikan teks input */}
       {isProductModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
@@ -763,7 +820,7 @@ export default function StoreDetailPage() {
                     name="nama"
                     value={productFormData.nama}
                     onChange={handleInputChange}
-                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-xs sm:text-sm transition-all"
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-xs sm:text-sm transition-all text-gray-900 bg-white"
                     placeholder="Contoh: Baju Kaos Hitam"
                     required
                   />
@@ -775,7 +832,7 @@ export default function StoreDetailPage() {
                     name="jenis_produk_id"
                     value={productFormData.jenis_produk_id}
                     onChange={handleInputChange}
-                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-xs sm:text-sm transition-all bg-white"
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-xs sm:text-sm transition-all text-gray-900 bg-white"
                     required
                   >
                     <option value="" disabled>-- Pilih Jenis --</option>
@@ -795,7 +852,7 @@ export default function StoreDetailPage() {
                     min="0"
                     value={productFormData.harga}
                     onChange={handleInputChange}
-                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-xs sm:text-sm transition-all"
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-xs sm:text-sm transition-all text-gray-900 bg-white"
                     placeholder="Contoh: 50000"
                     required
                   />
@@ -847,7 +904,7 @@ export default function StoreDetailPage() {
         </div>
       )}
 
-      {/* Modal Hapus Produk */}
+      {/* Modal Hapus Produk dengan perbaikan teks input */}
       {isDeleteModalOpen && productToDelete && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
@@ -864,7 +921,7 @@ export default function StoreDetailPage() {
                 value={deleteInputName}
                 onChange={(e) => setDeleteInputName(e.target.value)}
                 placeholder="Ketik nama produk..."
-                className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none text-xs sm:text-sm transition-all mb-4 sm:mb-6 text-center"
+                className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none text-xs sm:text-sm transition-all mb-4 sm:mb-6 text-center text-gray-900 bg-white"
               />
               
               <div className="flex gap-2 sm:gap-3">

@@ -56,8 +56,39 @@ export default function StorePage() {
     previewFoto: '' as string,
   });
 
+  // [REALTIME DUA ARAH STORE]: Mendengarkan perubahan data tabel toko secara langsung agar status user terbarui instan
   useEffect(() => {
-    fetchData();
+    let channel: any;
+
+    const initRealtimeStore = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      fetchData();
+
+      channel = supabase
+        .channel('realtime-store-page-sync')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'toko',
+          },
+          () => {
+            fetchData();
+          }
+        )
+        .subscribe();
+    };
+
+    initRealtimeStore();
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
   }, []);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -237,7 +268,6 @@ export default function StorePage() {
 
       if (updateError) throw updateError;
 
-      // Kirim notifikasi real-time ke pemilik toko
       await sendNotification(
         targetToko.user_id,
         'Permintaan Gabung Toko',
@@ -519,6 +549,7 @@ export default function StorePage() {
         </div>
       )}
 
+      {/* Modal Tambah/Edit Toko dengan perbaikan warna teks input (text-gray-900 bg-white) */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
@@ -540,7 +571,7 @@ export default function StorePage() {
                     name="nama"
                     value={formData.nama}
                     onChange={handleInputChange}
-                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-xs sm:text-sm transition-all"
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-xs sm:text-sm transition-all text-gray-900 bg-white"
                     placeholder="Masukkan nama toko"
                     required
                   />
@@ -552,7 +583,7 @@ export default function StorePage() {
                     name="kategori_id"
                     value={formData.kategori_id}
                     onChange={handleInputChange}
-                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-xs sm:text-sm transition-all bg-white"
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-xs sm:text-sm transition-all text-gray-900 bg-white"
                     required
                   >
                     <option value="" disabled>-- Pilih Kategori --</option>
@@ -571,7 +602,7 @@ export default function StorePage() {
                     value={formData.deskripsi}
                     onChange={handleInputChange}
                     rows={3}
-                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-xs sm:text-sm transition-all resize-none"
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-xs sm:text-sm transition-all resize-none text-gray-900 bg-white"
                     placeholder="Tuliskan deksripsi singkat toko..."
                   ></textarea>
                 </div>
@@ -622,6 +653,7 @@ export default function StorePage() {
         </div>
       )}
 
+      {/* Modal Gabung Toko dengan perbaikan warna teks input */}
       {isJoinModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col">
@@ -639,7 +671,7 @@ export default function StorePage() {
                   type="text"
                   value={joinStoreId}
                   onChange={(e) => setJoinStoreId(e.target.value)}
-                  className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-800 focus:border-amber-800 outline-none transition-all font-mono text-xs sm:text-sm"
+                  className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-800 focus:border-amber-800 outline-none transition-all font-mono text-xs sm:text-sm text-gray-900 bg-white"
                   placeholder="Masukkan ID unik toko..."
                   required
                 />
@@ -672,6 +704,7 @@ export default function StorePage() {
         </div>
       )}
 
+      {/* Modal Hapus Toko dengan perbaikan warna teks input */}
       {isDeleteModalOpen && tokoToDelete && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
@@ -688,7 +721,7 @@ export default function StorePage() {
                 value={deleteInputName}
                 onChange={(e) => setDeleteInputName(e.target.value)}
                 placeholder="Ketik nama toko..."
-                className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none text-xs sm:text-sm transition-all mb-4 sm:mb-6 text-center"
+                className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none text-xs sm:text-sm transition-all mb-4 sm:mb-6 text-center text-gray-900 bg-white"
               />
               
               <div className="flex gap-2 sm:gap-3">
