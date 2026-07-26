@@ -8,11 +8,10 @@ export async function GET(request: Request) {
   
   const cookieStore = await cookies();
   
- 
-  const redirectToCookie = cookieStore.get('redirectTo')?.value;
-  const queryNext = requestUrl.searchParams.get('next');
   
-
+  const queryNext = requestUrl.searchParams.get('next');
+  const redirectToCookie = cookieStore.get('redirectTo')?.value;
+  
   const next = queryNext ? decodeURIComponent(queryNext) : (redirectToCookie ? decodeURIComponent(redirectToCookie) : '/beranda');
   
   const origin = requestUrl.origin;
@@ -32,7 +31,7 @@ export async function GET(request: Request) {
                 cookieStore.set(name, value, options)
               );
             } catch {
-             
+              // Diabaikan jika dipanggil dari Server Component
             }
           },
         },
@@ -43,7 +42,8 @@ export async function GET(request: Request) {
     
     if (!error) {
      
-      const response = NextResponse.redirect(`${origin}${next}`);
+      const targetUrl = next.startsWith('http') ? next : `${origin}${next}`;
+      const response = NextResponse.redirect(targetUrl);
       response.cookies.delete('redirectTo');
       return response;
     }

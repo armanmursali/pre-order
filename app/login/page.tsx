@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+
   const handleGoogleLogin = async () => {
     setError('');
     setLoading(true);
@@ -20,10 +21,14 @@ export default function LoginPage() {
     try {
       const supabase = createClient();
 
+  
+      const redirectOrigin = window.location.origin;
+      const callbackUrl = `${redirectOrigin}/api/auth/callback?next=${encodeURIComponent(nextUrl)}`;
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(nextUrl)}`,
+          redirectTo: callbackUrl,
         },
       });
 
