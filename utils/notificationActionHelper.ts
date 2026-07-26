@@ -9,41 +9,24 @@ export function handleNotificationClick(
   notif: { id: string; title: string; message: string }, 
   router: AppRouterInstance
 ) {
-  const titleLower = notif.title.toLowerCase();
-  const message = notif.message;
+  const message = notif.message || '';
 
-  // [DINAMIS - MODUL ORDERS]: Penanganan untuk modul orders di masa depan
-  if (titleLower.includes('pesanan') || titleLower.includes('order') || message.includes('[ORDER_ID:')) {
-    const orderIdMatch = message.match(/\[ORDER_ID:(.*?)\]/);
-    if (orderIdMatch && orderIdMatch[1]) {
-      router.push(`/orders/${orderIdMatch[1]}`);
-      return;
-    }
-    router.push('/orders');
+  // [PERBAIKAN PRESISI]: Ekstraksi ID Toko secara langsung dari pola [STORE_ID:...] yang dikirim oleh helper
+  const storeIdMatch = message.match(/\[STORE_ID:(.*?)\]/);
+  
+  if (storeIdMatch && storeIdMatch[1]) {
+    const storeId = storeIdMatch[1].trim();
+    router.push(`/store/${storeId}`);
     return;
   }
 
-  // [DINAMIS - MODUL STORE / TOKO]: Langsung terlempar ke parameter ID toko
-  if (titleLower.includes('toko') || message.includes('meminta untuk bergabung') || message.includes('[STORE_ID:')) {
-    // 1. Cek jika pesan memiliki pola penanda [STORE_ID:...]
-    const storeIdMatch = message.match(/\[STORE_ID:(.*?)\]/);
-    if (storeIdMatch && storeIdMatch[1]) {
-      router.push(`/store/${storeIdMatch[1]}`);
-      return;
-    }
-
-    // 2. Jika tidak ada penanda khusus, coba cari pola UUID standar di dalam teks pesan
-    const uuidMatch = message.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
-    if (uuidMatch && uuidMatch[0]) {
-      router.push(`/store/${uuidMatch[0]}`);
-      return;
-    }
-
-    // 3. Fallback jika ID tidak ditemukan sama sekali di dalam pesan
-    router.push('/store');
+  // [CADANGAN AMAN]: Jika format khusus tidak ditemukan, cari pola UUID standar di dalam teks pesan
+  const uuidMatch = message.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  if (uuidMatch && uuidMatch[0]) {
+    router.push(`/store/${uuidMatch[0]}`);
     return;
   }
 
-  // [FALLBACK DEFAULT AMAN]
+  // [FALLBACK DEFAULT]: Jika tidak ada ID sama sekali, arahkan ke halaman utama store
   router.push('/store');
 }
