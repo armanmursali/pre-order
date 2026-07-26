@@ -29,10 +29,6 @@ interface ProdukDetail {
 
 export default function PublicProductDetailPage() {
   const params = useParams();
-  // Memastikan ekstraksi ID aman dari tipe data array/string rute dinamis Next.js
-  const rawId = params?.id;
-  const productId = Array.isArray(rawId) ? rawId[0] : rawId;
-
   const router = useRouter();
   const supabase = createClient();
 
@@ -41,11 +37,18 @@ export default function PublicProductDetailPage() {
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
+  // [PERBAIKAN PRESISI PARAMS]: Memastikan ekstraksi ID aman dari struktur objek Next.js
   useEffect(() => {
-    if (productId) {
-      fetchPublicProductData(productId);
-    }
-  }, [productId]);
+    const resolveParams = async () => {
+      if (params && params.id) {
+        const resolvedId = Array.isArray(params.id) ? params.id[0] : params.id;
+        if (resolvedId) {
+          await fetchPublicProductData(resolvedId);
+        }
+      }
+    };
+    resolveParams();
+  }, [params]);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
@@ -60,7 +63,7 @@ export default function PublicProductDetailPage() {
     }).format(angka);
   };
 
-  // [FUNGSI AMBIL DATA PRODUK PUBLIK]: Mengambil detail produk beserta informasi toko pemiliknya
+  // [FUNGSI AMBIL DATA PRODUK PUBLIK]: Mengambil detail produk beserta informasi toko pemiliknya secara aman
   const fetchPublicProductData = async (targetId: string) => {
     try {
       setLoading(true);
@@ -69,11 +72,11 @@ export default function PublicProductDetailPage() {
         .from('produk')
         .select('*, jenis_produk(nama), toko:toko_id(id, user_id, nama, telepon, alamat, rekening, metode_pembayaran)')
         .eq('id', targetId)
-        .single();
+        .maybeSingle(); // Menggunakan maybeSingle agar tidak memicu exception 404 mentah pada server jika data kosong
 
       if (errorProduk || !dataProduk) {
-        showToast('Produk tidak ditemukan.', 'error');
-        router.push('/beranda');
+        showToast('Produk tidak ditemukan di database.', 'error');
+        setLoading(false);
         return;
       }
 
@@ -95,7 +98,19 @@ export default function PublicProductDetailPage() {
   }
 
   if (!produk) {
-    return null;
+    return (
+      <div className="bg-white text-gray-800 rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+        <i className="fa-solid fa-triangle-exclamation text-4xl text-amber-600 mb-3"></i>
+        <h2 className="text-lg font-bold text-gray-800 mb-1">Produk Tidak Ditemukan</h2>
+        <p className="text-xs sm:text-sm text-gray-500 mb-6">Produk dengan ID tersebut mungkin telah dihapus atau URL tidak valid.</p>
+        <button
+          onClick={() => router.push('/beranda')}
+          className="bg-amber-800 hover:bg-amber-900 text-white px-5 py-2 rounded-xl text-xs sm:text-sm font-medium transition-colors"
+        >
+          Kembali ke Beranda
+        </button>
+      </div>
+    );
   }
 
   return (
