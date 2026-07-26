@@ -102,7 +102,8 @@ export default function PublicStoreDetailPage() {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 flex flex-col items-center justify-center min-h-[400px]">
+      /* [KOMENTAR PERBAIKAN]: Penambahan penegas warna latar belakang putih dan teks gelap agar kebal dari mode gelap paksa browser */
+      <div className="bg-white text-gray-800 rounded-xl shadow-sm border border-gray-200 p-8 flex flex-col items-center justify-center min-h-[400px]">
         <i className="fa-solid fa-circle-notch fa-spin text-4xl text-orange-600 mb-4"></i>
         <p className="text-gray-500 font-medium">Memuat informasi toko...</p>
       </div>
@@ -114,7 +115,8 @@ export default function PublicStoreDetailPage() {
   }
 
   return (
-    <div className="space-y-6 relative p-0.5 sm:p-6">
+    /* [KOMENTAR PERBAIKAN]: Mengunci seluruh kontainer halaman utama dengan bg-white penting dan text-gray-900 di level teratas */
+    <div className="space-y-6 relative p-0.5 sm:p-6 bg-white text-gray-900 min-h-screen">
       {/* Tombol Kembali ke Beranda */}
       <div className="flex items-center gap-3">
         <button
@@ -128,7 +130,7 @@ export default function PublicStoreDetailPage() {
       </div>
 
       {/* Bagian Detail Informasi Toko (Read-Only untuk Pengunjung) */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white text-gray-900 rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-200 flex items-center justify-between bg-orange-50/30">
           <h2 className="text-base sm:text-lg font-bold text-amber-900">Informasi Toko</h2>
           <span className="bg-orange-100 text-orange-800 px-3 sm:px-4 py-1.5 rounded-full text-[10px] sm:text-xs font-bold tracking-wide">
@@ -136,29 +138,29 @@ export default function PublicStoreDetailPage() {
           </span>
         </div>
 
-        <div className="p-4 sm:p-6 md:p-8 flex flex-col md:flex-row gap-6 sm:gap-8">
+        <div className="p-4 sm:p-6 md:p-8 flex flex-col md:flex-row gap-6 sm:gap-8 bg-white">
           <div className="w-full md:w-1/3 flex-shrink-0">
-            <div className="aspect-square rounded-2xl overflow-hidden border-2 border-gray-100 shadow-sm bg-gray-50 flex items-center justify-center cursor-pointer" onClick={() => toko.foto && setPreviewImageUrl(toko.foto)}>
+            <div className="aspect-square rounded-2xl overflow-hidden border-2 border-gray-100 shadow-sm bg-white flex items-center justify-center cursor-pointer" onClick={() => toko.foto && setPreviewImageUrl(toko.foto)}>
               {toko.foto ? (
                 <img src={toko.foto} alt={toko.nama} className="w-full h-full object-cover" />
               ) : (
-                <div className="text-center text-gray-400">
-                  <i className="fa-solid fa-store text-5xl sm:text-6xl mb-2 sm:mb-3"></i>
-                  <p className="text-xs sm:text-sm font-medium">Tidak ada foto</p>
+                <div className="text-center text-gray-400 bg-white p-4 rounded-2xl">
+                  <i className="fa-solid fa-store text-5xl sm:text-6xl mb-2 sm:mb-3 text-gray-300"></i>
+                  <p className="text-xs sm:text-sm font-medium text-gray-400">Tidak ada foto</p>
                 </div>
               )}
             </div>
           </div>
 
-          <div className="w-full md:w-2/3 flex flex-col">
+          <div className="w-full md:w-2/3 flex flex-col bg-white">
             <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-2">{toko.nama}</h2>
             <p className="text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6 flex items-center gap-2">
               <i className="fa-regular fa-calendar-days"></i>
               Terdaftar pada {new Date(toko.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
             </p>
 
-            <div className="space-y-3 sm:space-y-4">
-              <div className="p-3.5 sm:p-4 bg-gray-50 rounded-xl border border-gray-100">
+            <div className="space-y-3 sm:space-y-4 bg-white">
+              <div className="p-3.5 sm:p-4 bg-white rounded-xl border border-gray-200">
                 <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 sm:mb-2">Deskripsi Toko</p>
                 <p className="text-xs sm:text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
                   {toko.deskripsi ? toko.deskripsi : <span className="italic text-gray-400">Tidak ada deskripsi yang ditambahkan.</span>}
@@ -166,8 +168,8 @@ export default function PublicStoreDetailPage() {
               </div>
 
               {/* Informasi Kontak, Alamat, Rekening, dan Metode Pembayaran */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                <div className="p-3.5 sm:p-4 bg-gray-50 rounded-xl border border-gray-100">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 bg-white">
+                <div className="p-3.5 sm:p-4 bg-white rounded-xl border border-gray-200">
                   <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Nomor Telepon / WhatsApp</p>
                   <p className="text-xs sm:text-sm font-medium text-gray-900 flex items-center gap-2">
                     <i className="fa-solid fa-phone text-orange-600"></i>
@@ -175,7 +177,7 @@ export default function PublicStoreDetailPage() {
                   </p>
                 </div>
 
-                <div className="p-3.5 sm:p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <div className="p-3.5 sm:p-4 bg-white rounded-xl border border-gray-200">
                   <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Metode Pembayaran</p>
                   <p className="text-xs sm:text-sm font-medium text-gray-900 flex items-center gap-2">
                     <i className="fa-solid fa-wallet text-orange-600"></i>
@@ -183,7 +185,7 @@ export default function PublicStoreDetailPage() {
                   </p>
                 </div>
 
-                <div className="p-3.5 sm:p-4 bg-gray-50 rounded-xl border border-gray-100 md:col-span-2">
+                <div className="p-3.5 sm:p-4 bg-white rounded-xl border border-gray-200 md:col-span-2">
                   <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Alamat Lengkap</p>
                   <p className="text-xs sm:text-sm font-medium text-gray-900 flex items-start gap-2">
                     <i className="fa-solid fa-location-dot text-orange-600 mt-0.5"></i>
@@ -191,7 +193,7 @@ export default function PublicStoreDetailPage() {
                   </p>
                 </div>
 
-                <div className="p-3.5 sm:p-4 bg-gray-50 rounded-xl border border-gray-100 md:col-span-2">
+                <div className="p-3.5 sm:p-4 bg-white rounded-xl border border-gray-200 md:col-span-2">
                   <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Rekening Pembayaran (Transfer)</p>
                   <p className="text-xs sm:text-sm font-medium text-gray-900 flex items-start gap-2">
                     <i className="fa-solid fa-credit-card text-orange-600 mt-0.5"></i>
@@ -205,27 +207,27 @@ export default function PublicStoreDetailPage() {
       </div>
 
       {/* Bagian Daftar Produk Toko */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
-        <div className="mb-4 sm:mb-6 border-b border-gray-100 pb-3.5 sm:pb-4">
+      <div className="bg-white text-gray-900 rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+        <div className="mb-4 sm:mb-6 border-b border-gray-100 pb-3.5 sm:pb-4 bg-white">
           <h2 className="text-lg sm:text-xl font-bold text-amber-900">Produk yang Dijual</h2>
           <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Daftar barang dan produk dari toko ini.</p>
         </div>
 
         {produks.length === 0 ? (
-          <div className="text-center py-10 sm:py-12 text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-300 text-xs sm:text-sm">
-            <i className="fa-solid fa-box-open text-3xl sm:text-4xl mb-2 sm:mb-3 text-gray-400"></i>
+          <div className="text-center py-10 sm:py-12 text-gray-500 bg-white rounded-xl border border-dashed border-gray-300 text-xs sm:text-sm">
+            <i className="fa-solid fa-box-open text-3xl sm:text-4xl mb-2 sm:mb-3 text-gray-300 block"></i>
             <p>Toko ini belum memiliki produk.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 bg-white">
             {produks.map((produk) => (
               <div key={produk.id} className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all flex flex-col overflow-hidden">
-                <div className="h-48 w-full bg-gray-100 flex-shrink-0 relative cursor-pointer" onClick={() => produk.foto && setPreviewImageUrl(produk.foto)}>
+                <div className="h-48 w-full bg-white flex-shrink-0 relative cursor-pointer border-b border-gray-100" onClick={() => produk.foto && setPreviewImageUrl(produk.foto)}>
                   {produk.foto ? (
                     <img src={produk.foto} alt={produk.nama} className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-300">
-                      <i className="fa-solid fa-box text-5xl"></i>
+                    <div className="w-full h-full flex items-center justify-center text-gray-300 bg-white">
+                      <i className="fa-solid fa-box text-5xl text-gray-200"></i>
                     </div>
                   )}
                   <div className="absolute bottom-3 left-3 bg-amber-900/90 backdrop-blur-sm text-white px-3 py-1 rounded-lg font-bold shadow-sm text-sm">
@@ -233,7 +235,7 @@ export default function PublicStoreDetailPage() {
                   </div>
                 </div>
                 
-                <div className="p-5 flex flex-col flex-grow">
+                <div className="p-5 flex flex-col flex-grow bg-white">
                   <span className="w-fit bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider mb-2">
                     {produk.jenis_produk?.nama || 'Tanpa Jenis'}
                   </span>
@@ -261,7 +263,7 @@ export default function PublicStoreDetailPage() {
             <img
               src={previewImageUrl}
               alt="Pratinjau Penuh"
-              className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl border border-gray-700"
+              className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl border border-gray-700 bg-white"
             />
           </div>
         </div>
