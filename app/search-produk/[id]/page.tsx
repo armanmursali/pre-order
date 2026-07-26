@@ -88,7 +88,6 @@ export default function PublicProductDetailPage() {
       }
 
       setProduk(dataProduk);
-      // Set default metode pembayaran pertama jika tersedia
       if (dataProduk.toko?.metode_pembayaran) {
         if (dataProduk.toko.metode_pembayaran.toLowerCase().includes('transfer')) {
           setMetodePilihan('Transfer');
@@ -115,7 +114,7 @@ export default function PublicProductDetailPage() {
 
       let buktiUrl = null;
 
-      // Jika memilih metode transfer, wajib unggah bukti transfer
+      // Jika memilih metode transfer, unggah bukti transfer ke storage bucket 'bukti-transfer'
       if (metodePilihan === 'Transfer') {
         if (!fileBukti) {
           throw new Error('Silakan unggah bukti transfer terlebih dahulu.');
@@ -126,7 +125,7 @@ export default function PublicProductDetailPage() {
         const filePath = `public/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
-          .from('bukti-transfer') // Pastikan bucket storage 'bukti-transfer' tersedia di Supabase Anda
+          .from('bukti-transfer')
           .upload(filePath, fileBukti);
 
         if (uploadError) throw uploadError;
@@ -156,7 +155,6 @@ export default function PublicProductDetailPage() {
       if (insertError) throw insertError;
 
       showToast('Pesanan berhasil dibuat! Status: Belum Diterima pemilik.', 'success');
-      // Reset form kecil
       setJumlah(1);
       setFileBukti(null);
       setPreviewBukti('');
@@ -206,21 +204,22 @@ export default function PublicProductDetailPage() {
         <h1 className="text-xl font-bold text-amber-900">Detail Produk & Pembayaran</h1>
       </div>
 
-      {/* Bagian Detail Produk (Ukuran diperkecil dan lebih proporsional) */}
-      <div className="bg-white text-gray-900 rounded-xl shadow-sm border border-gray-200 overflow-hidden max-w-4xl mx-auto">
-        <div className="px-4 sm:px-5 py-3 border-b border-gray-200 flex items-center justify-between bg-orange-50/30">
-          <span className="bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
-            {produk.jenis_produk?.nama || 'Tanpa Jenis'}
-          </span>
-          <span className="text-xs font-semibold text-gray-500">
-            Dijual di: <strong className="text-amber-900">{produk.toko?.nama || 'Toko'}</strong>
-          </span>
-        </div>
+      {/* [TATA LETAK 2 KOLOM]: Kolom Kiri untuk Detail Produk, Kolom Kanan untuk Proses Pembayaran */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start max-w-7xl mx-auto">
+        
+        {/* KOLOM KIRI: Detail Produk & Informasi Toko */}
+        <div className="bg-white text-gray-900 rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="px-4 sm:px-5 py-3 border-b border-gray-200 flex items-center justify-between bg-orange-50/30">
+            <span className="bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
+              {produk.jenis_produk?.nama || 'Tanpa Jenis'}
+            </span>
+            <span className="text-xs font-semibold text-gray-500">
+              Dijual di: <strong className="text-amber-900">{produk.toko?.nama || 'Toko'}</strong>
+            </span>
+          </div>
 
-        <div className="p-4 sm:p-6 flex flex-col md:flex-row gap-6 bg-white">
-          {/* Foto produk dengan ukuran lebih kecil/proporsional */}
-          <div className="w-full md:w-1/3 flex-shrink-0">
-            <div className="aspect-square w-48 mx-auto md:w-full rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-white flex items-center justify-center cursor-pointer" onClick={() => produk.foto && setPreviewImageUrl(produk.foto)}>
+          <div className="p-4 sm:p-6 space-y-4 bg-white">
+            <div className="aspect-square w-48 sm:w-64 mx-auto rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-white flex items-center justify-center cursor-pointer" onClick={() => produk.foto && setPreviewImageUrl(produk.foto)}>
               {produk.foto ? (
                 <img src={produk.foto} alt={produk.nama} className="w-full h-full object-cover" />
               ) : (
@@ -230,34 +229,32 @@ export default function PublicProductDetailPage() {
                 </div>
               )}
             </div>
-          </div>
 
-          <div className="w-full md:w-2/3 flex flex-col justify-between bg-white">
-            <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">{produk.nama}</h2>
-              <div className="mb-4">
+            <div className="space-y-2">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">{produk.nama}</h2>
+              <div>
                 <span className="text-xl sm:text-2xl font-bold text-amber-900">
                   {formatRupiah(produk.harga)}
                 </span>
                 <span className="text-xs text-gray-500 ml-2">per item</span>
               </div>
+            </div>
 
-              {/* Informasi Toko Penjual Produk */}
-              <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-200 space-y-2 mb-4 text-xs">
-                <h3 className="font-bold text-gray-500 uppercase tracking-wider">Informasi Penjual / Toko</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div>
-                    <p className="text-gray-500">Nama Toko:</p>
-                    <p className="font-semibold text-gray-900">{produk.toko?.nama || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500">Nomor Telepon:</p>
-                    <p className="font-semibold text-gray-900">{produk.toko?.telepon || 'Tidak tersedia'}</p>
-                  </div>
-                  <div className="sm:col-span-2">
-                    <p className="text-gray-500">Alamat:</p>
-                    <p className="font-semibold text-gray-900">{produk.toko?.alamat || 'Tidak tersedia'}</p>
-                  </div>
+            {/* Informasi Toko Penjual Produk */}
+            <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-200 space-y-2 text-xs">
+              <h3 className="font-bold text-gray-500 uppercase tracking-wider">Informasi Penjual / Toko</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <p className="text-gray-500">Nama Toko:</p>
+                  <p className="font-semibold text-gray-900">{produk.toko?.nama || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Nomor Telepon:</p>
+                  <p className="font-semibold text-gray-900">{produk.toko?.telepon || 'Tidak tersedia'}</p>
+                </div>
+                <div className="sm:col-span-2">
+                  <p className="text-gray-500">Alamat:</p>
+                  <p className="font-semibold text-gray-900">{produk.toko?.alamat || 'Tidak tersedia'}</p>
                 </div>
               </div>
             </div>
@@ -274,98 +271,103 @@ export default function PublicProductDetailPage() {
           </div>
         </div>
 
-        {/* [FORMULIR TRANSAKSI / PEMBAYARAN]: Kuantitas, Dinamis Harga, Metode & Bukti Transfer */}
-        <div className="border-t border-gray-200 p-4 sm:p-6 bg-orange-50/20">
-          <h3 className="text-base font-bold text-amber-900 mb-4 flex items-center gap-2">
-            <i className="fa-solid fa-cart-shopping text-orange-600"></i>
-            <span>Formulir Pesanan & Pembayaran</span>
-          </h3>
+        {/* KOLOM KANAN: Formulir Pesanan & Proses Pembayaran */}
+        <div className="bg-white text-gray-900 rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="px-4 sm:px-5 py-3 border-b border-gray-200 bg-orange-50/30">
+            <h3 className="text-base font-bold text-amber-900 flex items-center gap-2">
+              <i className="fa-solid fa-cart-shopping text-orange-600"></i>
+              <span>Formulir Pesanan & Pembayaran</span>
+            </h3>
+          </div>
 
-          <form onSubmit={handleCheckout} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Jumlah / Kuantitas Pesanan */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Jumlah Pembelian</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={jumlah}
-                  onChange={(e) => setJumlah(parseInt(e.target.value) || 1)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm bg-white text-gray-900 outline-none focus:ring-2 focus:ring-orange-500"
-                  required
-                />
-              </div>
-
-              {/* Total Harga Dinamis */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Total Harga Dinamis</label>
-                <div className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-xs sm:text-sm font-bold text-amber-900 flex items-center">
-                  {formatRupiah(produk.harga * jumlah)}
-                </div>
-              </div>
-            </div>
-
-            {/* Pilihan Jenis Pembayaran */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Pilih Metode Pembayaran</label>
-              <select
-                value={metodePilihan}
-                onChange={(e) => setMetodePilihan(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm bg-white text-gray-900 outline-none focus:ring-2 focus:ring-orange-500"
-              >
-                <option value="Tunai">Tunai (Cash)</option>
-                <option value="Transfer">Transfer Bank</option>
-              </select>
-            </div>
-
-            {/* Jika Memilih Transfer: Tampil Informasi Rekening & Upload Bukti Transfer */}
-            {metodePilihan === 'Transfer' && (
-              <div className="p-4 bg-white rounded-xl border border-orange-200 space-y-3">
-                <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900">
-                  <p className="font-bold mb-1"><i className="fa-solid fa-circle-info mr-1"></i> Informasi Rekening Tujuan:</p>
-                  <p className="font-mono whitespace-pre-wrap">{produk.toko?.rekening || 'Belum ada informasi rekening.'}</p>
-                </div>
-
+          <div className="p-4 sm:p-6 bg-white">
+            <form onSubmit={handleCheckout} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Jumlah / Kuantitas Pesanan */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Upload Bukti Transfer</label>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Jumlah Pembelian</label>
                   <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        const file = e.target.files[0];
-                        setFileBukti(file);
-                        setPreviewBukti(URL.createObjectURL(file));
-                      }
-                    }}
-                    className="w-full text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100"
+                    type="number"
+                    min="1"
+                    value={jumlah}
+                    onChange={(e) => setJumlah(parseInt(e.target.value) || 1)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm bg-white text-gray-900 outline-none focus:ring-2 focus:ring-orange-500"
                     required
                   />
-                  {previewBukti && (
-                    <div className="mt-2">
-                      <img src={previewBukti} alt="Pratinjau Bukti" className="w-32 h-32 object-cover rounded-lg border border-gray-200 shadow-sm" />
-                    </div>
-                  )}
+                </div>
+
+                {/* Total Harga Dinamis */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Total Harga Dinamis</label>
+                  <div className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-xs sm:text-sm font-bold text-amber-900 flex items-center">
+                    {formatRupiah(produk.harga * jumlah)}
+                  </div>
                 </div>
               </div>
-            )}
 
-            {/* Tombol Kirim Pesanan */}
-            <div className="pt-2 flex justify-end">
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-colors shadow-sm flex items-center gap-2"
-              >
-                {isSubmitting ? (
-                  <><i className="fa-solid fa-circle-notch fa-spin"></i> Memproses Pesanan...</>
-                ) : (
-                  <><i className="fa-solid fa-paper-plane"></i> Kirim Pesanan Sekarang</>
-                )}
-              </button>
-            </div>
-          </form>
+              {/* Pilihan Jenis Pembayaran */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Pilih Metode Pembayaran</label>
+                <select
+                  value={metodePilihan}
+                  onChange={(e) => setMetodePilihan(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm bg-white text-gray-900 outline-none focus:ring-2 focus:ring-orange-500"
+                >
+                  <option value="Tunai">Tunai (Cash)</option>
+                  <option value="Transfer">Transfer Bank</option>
+                </select>
+              </div>
+
+              {/* Jika Memilih Transfer: Tampil Informasi Rekening & Upload Bukti Transfer */}
+              {metodePilihan === 'Transfer' && (
+                <div className="p-4 bg-gray-50 rounded-xl border border-orange-200 space-y-3">
+                  <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900">
+                    <p className="font-bold mb-1"><i className="fa-solid fa-circle-info mr-1"></i> Informasi Rekening Tujuan:</p>
+                    <p className="font-mono whitespace-pre-wrap">{produk.toko?.rekening || 'Belum ada informasi rekening.'}</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Upload Bukti Transfer</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          const file = e.target.files[0];
+                          setFileBukti(file);
+                          setPreviewBukti(URL.createObjectURL(file));
+                        }
+                      }}
+                      className="w-full text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100"
+                      required
+                    />
+                    {previewBukti && (
+                      <div className="mt-2">
+                        <img src={previewBukti} alt="Pratinjau Bukti" className="w-32 h-32 object-cover rounded-lg border border-gray-200 shadow-sm" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Tombol Kirim Pesanan */}
+              <div className="pt-2 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full sm:w-auto bg-orange-600 hover:bg-orange-700 text-white px-6 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-colors shadow-sm flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? (
+                    <><i className="fa-solid fa-circle-notch fa-spin"></i> Memproses Pesanan...</>
+                  ) : (
+                    <><i className="fa-solid fa-paper-plane"></i> Kirim Pesanan Sekarang</>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
+
       </div>
 
       {/* Modal Preview Gambar */}
