@@ -13,7 +13,7 @@ interface TokoDetail {
   deskripsi?: string | null;
   foto: string | null;
   created_at: string;
-  anggota?: any[]; // [BARU]: Menyimpan array daftar anggota
+  anggota?: any[]; 
   kategori_toko?: {
     nama: string;
   };
@@ -42,6 +42,7 @@ export default function StoreDetailPage() {
   const supabase = createClient();
 
   const [toko, setToko] = useState<TokoDetail | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [isOwner, setIsOwner] = useState<boolean>(false);
 
@@ -84,6 +85,12 @@ export default function StoreDetailPage() {
     }).format(angka);
   };
 
+  // [BARU]: Fungsi untuk menyalin ID Toko ke clipboard
+  const handleCopyId = (id: string) => {
+    navigator.clipboard.writeText(id);
+    showToast('ID Toko berhasil disalin ke clipboard!', 'success');
+  };
+
   useEffect(() => {
     if (params?.id) {
       fetchAllData(params.id);
@@ -99,6 +106,8 @@ export default function StoreDetailPage() {
         return;
       }
       
+      setCurrentUserId(session.user.id);
+
       const { data: dataToko, error: errorToko } = await supabase
         .from('toko')
         .select('*, kategori_toko(nama)')
@@ -112,18 +121,38 @@ export default function StoreDetailPage() {
       }
 
       const userId = session.user.id;
-      const listAnggota = Array.isArray(dataToko.anggota) ? dataToko.anggota : [];
-      const primaryOwner = dataToko.user_id === userId;
+      let listAnggota = Array.isArray(dataToko.anggota) ? dataToko.anggota : [];
+      
+      // Pastikan pemilik utama selalu terdaftar di dalam list anggota agar namanya tampil
+      const primaryOwnerId = dataToko.user_id;
+      const isPrimaryOwner = primaryOwnerId === userId;
+      const ownerExists = listAnggota.some((m: any) => m.user_id === primaryOwnerId);
+
+      if (!ownerExists) {
+        const { data: ownerProfile } = await supabase
+          .from('users')
+          .select('nama, email')
+          .eq('id', primaryOwnerId)
+          .maybeSingle();
+
+        listAnggota.unshift({
+          user_id: primaryOwnerId,
+          nama: ownerProfile?.nama || 'Pemilik Utama',
+          email: ownerProfile?.email || '',
+          status: 'pemilik'
+        });
+      }
+
       const memberEntry = listAnggota.find((m: any) => m.user_id === userId);
       const isMemberOwner = memberEntry?.status === 'pemilik';
-      const isUserOwner = primaryOwner || isMemberOwner;
+      const isUserOwner = isPrimaryOwner || isMemberOwner;
 
       setIsOwner(isUserOwner);
 
       const isApproved = memberEntry?.status === 'tergabung';
 
-      if (!isUserOwner && !isApproved) {
-        showToast('Anda belum disetujui atau tidak memiliki akses ke toko ini.', 'error');
+      if (!isUserOwner && !isApproved && memberEntry?.status !== 'pending') {
+        showToast('Anda tidak memiliki akses ke toko ini.', 'error');
         router.push('/store');
         return;
       }
@@ -152,7 +181,7 @@ export default function StoreDetailPage() {
     }
   };
 
-  // [BARU]: Manajemen status anggota melalui kolom JSONB 'anggota' di tabel 'toko'
+  // [LOGIKA STATUS ANGGOTA]: Mengatur terima, ubah jadi pemilik, atau keluar/keluarkan
   const handleUpdateAnggotaStatus = async (targetUserId: string, newStatus: string) => {
     if (!toko) return;
     try {
@@ -162,7 +191,7 @@ export default function StoreDetailPage() {
       const currentAnggota = Array.isArray(toko.anggota) ? toko.anggota : [];
       let updatedAnggota = [...currentAnggota];
 
-      if (newStatus === 'kick') {
+      if (newStatus === 'keluar' || newStatus === 'kick') {
         updatedAnggota = updatedAnggota.filter((m: any) => m.user_id !== targetUserId);
       } else {
         updatedAnggota = updatedAnggota.map((m: any) => {
@@ -181,7 +210,9 @@ export default function StoreDetailPage() {
       if (error) throw error;
 
       showToast(
-        newStatus === 'kick' 
+        newStatus === 'keluar' 
+          ? 'Anda berhasil keluar dari toko.' 
+          : newStatus === 'kick' 
           ? 'Anggota berhasil dikeluarkan.' 
           : newStatus === 'pemilik' 
           ? 'Anggota berhasil diubah menjadi Pemilik toko!' 
@@ -189,7 +220,11 @@ export default function StoreDetailPage() {
         'success'
       );
 
-      fetchAllData(toko.id);
+      if (newStatus === 'keluar') {
+        router.push('/store');
+      } else {
+        fetchAllData(toko.id);
+      }
     } catch (error: any) {
       showToast('Gagal memperbarui status anggota: ' + error.message, 'error');
     } finally {
@@ -372,88 +407,6 @@ export default function StoreDetailPage() {
         />
       )}
 
-      {/* Panel Daftar Anggota di Detail Toko (Default Tertutup) */}
-      {isOwner && (
-        <div className="bg-amber-50/60 rounded-xl shadow-sm border border-amber-200">
-          <button
-            onClick={() => setIsMemberListOpen(!isMemberListOpen)}
-            className="w-full px-4 sm:px-6 py-3.5 flex items-center justify-between text-left font-bold text-amber-900 bg-amber-100/50 hover:bg-amber-100 transition-colors text-xs sm:text-sm rounded-xl"
-          >
-            <span className="flex items-center gap-2">
-              <i className="fa-solid fa-users text-amber-800"></i> 
-              Daftar Anggota & Pengajuan Toko ({listAnggota.length})
-            </span>
-            <i className={`fa-solid fa-chevron-down transition-transform ${isMemberListOpen ? 'rotate-180' : ''}`}></i>
-          </button>
-
-          {isMemberListOpen && (
-            <div className="p-4 sm:p-6 divide-y divide-amber-100 overflow-visible">
-              {listAnggota.length === 0 ? (
-                <p className="text-xs sm:text-sm text-gray-500 italic py-2">Belum ada anggota lain di toko ini.</p>
-              ) : (
-                listAnggota.map((item: any) => (
-                  <div key={item.user_id} className="py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative">
-                    <div className="overflow-hidden">
-                      <h4 className="font-bold text-gray-900 text-xs sm:text-sm">{item.nama || 'Pengguna'}</h4>
-                      <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5">{item.email || 'Email tidak tersedia'}</p>
-                      <span className={`inline-block mt-1.5 px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold uppercase tracking-wider ${
-                        item.status === 'pemilik' 
-                          ? 'bg-amber-800 text-white' 
-                          : item.status === 'tergabung' 
-                          ? 'bg-orange-600 text-white' 
-                          : 'bg-yellow-500 text-white'
-                      }`}>
-                        {item.status === 'pemilik' ? 'toko/store saya' : item.status}
-                      </span>
-                    </div>
-
-                    <div className="relative inline-block text-left self-end sm:self-center z-30">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveMemberDropdown(activeMemberDropdown === item.user_id ? null : item.user_id);
-                        }}
-                        className="w-8 h-8 rounded-full bg-white text-gray-600 hover:bg-orange-100 hover:text-orange-700 flex items-center justify-center transition-colors shadow-sm border border-gray-200"
-                        title="Aksi Anggota"
-                      >
-                        <i className="fa-solid fa-ellipsis-vertical"></i>
-                      </button>
-
-                      {activeMemberDropdown === item.user_id && (
-                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-xl border border-gray-200 z-50 py-1">
-                          {item.status === 'pending' && (
-                            <button
-                              onClick={() => handleUpdateAnggotaStatus(item.user_id, 'tergabung')}
-                              className="w-full text-left px-4 py-2 text-xs sm:text-sm text-green-700 hover:bg-green-50 flex items-center gap-2 transition-colors font-medium"
-                            >
-                              <i className="fa-solid fa-check w-4"></i> Terima
-                            </button>
-                          )}
-                          {item.status !== 'pemilik' && (
-                            <button
-                              onClick={() => handleUpdateAnggotaStatus(item.user_id, 'pemilik')}
-                              className="w-full text-left px-4 py-2 text-xs sm:text-sm text-amber-800 hover:bg-amber-50 flex items-center gap-2 transition-colors font-medium"
-                            >
-                              <i className="fa-solid fa-user-shield w-4"></i> Ubah Jadi Pemilik
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleUpdateAnggotaStatus(item.user_id, 'kick')}
-                            className="w-full text-left px-4 py-2 text-xs sm:text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors font-medium"
-                          >
-                            <i className="fa-solid fa-user-slash w-4"></i> Keluarkan
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Bagian Detail Toko */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-200 flex items-center justify-between bg-orange-50/30">
@@ -505,9 +458,20 @@ export default function StoreDetailPage() {
                   <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Kategori Utama</p>
                   <p className="text-sm sm:text-base font-medium text-gray-900">{toko.kategori_toko?.nama || '-'}</p>
                 </div>
-                <div className="p-3.5 sm:p-4 bg-gray-50 rounded-xl border border-gray-100 overflow-hidden">
-                  <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">ID Sistem (UUID)</p>
-                  <p className="text-xs sm:text-sm font-mono text-gray-600 truncate">{toko.id}</p>
+                {/* [PERBAIKAN]: Menampilkan ID Toko yang bersih lengkap dengan tombol Salin */}
+                <div className="p-3.5 sm:p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between gap-2">
+                  <div className="overflow-hidden">
+                    <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">ID Toko</p>
+                    <p className="text-xs sm:text-sm font-mono text-gray-600 truncate">{toko.id}</p>
+                  </div>
+                  <button
+                    onClick={() => handleCopyId(toko.id)}
+                    className="flex-shrink-0 bg-amber-800 hover:bg-amber-900 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-sm flex items-center gap-1.5"
+                    title="Salin ID Toko"
+                  >
+                    <i className="fa-regular fa-copy"></i>
+                    <span>Salin</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -649,6 +613,93 @@ export default function StoreDetailPage() {
           </>
         )}
       </div>
+
+      {/* [PERBAIKAN POSISI]: Panel Daftar Anggota Toko dipindah ke bagian BAWAH detail toko */}
+      {isOwner && (
+        <div className="bg-amber-50/60 rounded-xl shadow-sm border border-amber-200">
+          <button
+            onClick={() => setIsMemberListOpen(!isMemberListOpen)}
+            className="w-full px-4 sm:px-6 py-3.5 flex items-center justify-between text-left font-bold text-amber-900 bg-amber-100/50 hover:bg-amber-100 transition-colors text-xs sm:text-sm rounded-xl"
+          >
+            <span className="flex items-center gap-2">
+              <i className="fa-solid fa-users text-amber-800"></i> 
+              Daftar Anggota & Pengajuan Toko ({listAnggota.length})
+            </span>
+            <i className={`fa-solid fa-chevron-down transition-transform ${isMemberListOpen ? 'rotate-180' : ''}`}></i>
+          </button>
+
+          {isMemberListOpen && (
+            <div className="p-4 sm:p-6 divide-y divide-amber-100 overflow-visible">
+              {listAnggota.length === 0 ? (
+                <p className="text-xs sm:text-sm text-gray-500 italic py-2">Belum ada anggota lain di toko ini.</p>
+              ) : (
+                listAnggota.map((item: any) => {
+                  const isMe = item.user_id === currentUserId;
+
+                  return (
+                    <div key={item.user_id} className="py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative">
+                      <div className="overflow-hidden">
+                        <h4 className="font-bold text-gray-900 text-xs sm:text-sm">{item.nama || 'Pengguna'}</h4>
+                        <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5">{item.email || 'Email tidak tersedia'}</p>
+                        <span className={`inline-block mt-1.5 px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold uppercase tracking-wider ${
+                          item.status === 'pemilik' 
+                            ? 'bg-amber-800 text-white' 
+                            : item.status === 'tergabung' 
+                            ? 'bg-orange-600 text-white' 
+                            : 'bg-yellow-500 text-white'
+                        }`}>
+                          {item.status === 'pemilik' ? 'toko/store saya' : item.status}
+                        </span>
+                      </div>
+
+                      <div className="relative inline-block text-left self-end sm:self-center z-30">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveMemberDropdown(activeMemberDropdown === item.user_id ? null : item.user_id);
+                          }}
+                          className="w-8 h-8 rounded-full bg-white text-gray-600 hover:bg-orange-100 hover:text-orange-700 flex items-center justify-center transition-colors shadow-sm border border-gray-200"
+                          title="Aksi Anggota"
+                        >
+                          <i className="fa-solid fa-ellipsis-vertical"></i>
+                        </button>
+
+                        {activeMemberDropdown === item.user_id && (
+                          <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-xl border border-gray-200 z-50 py-1">
+                            {item.status === 'pending' && (
+                              <button
+                                onClick={() => handleUpdateAnggotaStatus(item.user_id, 'tergabung')}
+                                className="w-full text-left px-4 py-2 text-xs sm:text-sm text-green-700 hover:bg-green-50 flex items-center gap-2 transition-colors font-medium"
+                              >
+                                <i className="fa-solid fa-check w-4"></i> Terima
+                              </button>
+                            )}
+                            {item.status !== 'pemilik' && (
+                              <button
+                                onClick={() => handleUpdateAnggotaStatus(item.user_id, 'pemilik')}
+                                className="w-full text-left px-4 py-2 text-xs sm:text-sm text-amber-800 hover:bg-amber-50 flex items-center gap-2 transition-colors font-medium"
+                              >
+                                <i className="fa-solid fa-user-shield w-4"></i> Ubah Jadi Pemilik
+                              </button>
+                            )}
+                            {/* [LOGIKA KELUAR / KELUARKAN]: Jika akun sendiri bertuliskan 'Keluar', jika akun lain bertuliskan 'Keluarkan' */}
+                            <button
+                              onClick={() => handleUpdateAnggotaStatus(item.user_id, isMe ? 'keluar' : 'kick')}
+                              className="w-full text-left px-4 py-2 text-xs sm:text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors font-medium"
+                            >
+                              <i className="fa-solid fa-user-slash w-4"></i> {isMe ? 'Keluar' : 'Keluarkan'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Modal Tambah/Edit Produk */}
       {isProductModalOpen && (
