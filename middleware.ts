@@ -3,7 +3,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
-  // Mengambil variabel lingkungan Supabase (mendukung key standar atau publishable key Supabase terbaru)
+  // Mengambil variabel lingkungan Supabase
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
@@ -43,18 +43,19 @@ export async function middleware(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
 
-  // Logika rute di dalam (dashboard) yang memerlukan autentikasi
-  const isDashboardRoute = path.startsWith('/beranda');
+  // [PERBAIKAN DINAMIS]: Menentukan halaman publik yang boleh diakses tanpa login (misal: /login, /landing, dll)
+  // Segala rute di luar daftar publik ini (termasuk semua menu di dalam (dashboard) seperti /beranda, /store, dan rute masa depan) otomatis dianggap privat.
+  const isPublicRoute = path === '/login' || path === '/';
 
-  // Pengamanan rute: Jika belum login dan mencoba mengakses /beranda, lempar ke /login
-  if (!user && isDashboardRoute) {
+  // Pengamanan rute: Jika pengguna belum login dan mencoba mengakses halaman selain rute publik, lempar ke /login
+  if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);
   }
 
-  // Jika sudah login dan mencoba mengakses halaman /login, arahkan otomatis ke /beranda
-  if (user && path.startsWith('/login')) {
+  // Jika pengguna sudah login dan mencoba mengakses halaman /login, arahkan otomatis ke /beranda
+  if (user && path === '/login') {
     const url = request.nextUrl.clone();
     url.pathname = '/beranda';
     return NextResponse.redirect(url);
