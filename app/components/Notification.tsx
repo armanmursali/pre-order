@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
-// [HELPER AKSI]: Memanggil penanganan klik notifikasi secara modular
+// [PERBAIKAN PRESISI]: Mengimpor helper aksi notifikasi untuk menangani navigasi dinamis secara aman
 import { handleNotificationClick } from '@/utils/notificationActionHelper';
 
 interface NotificationProps {
@@ -36,10 +36,10 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
 
       const userId = session.user.id;
 
-      // [LOGIKA UTAMA]: Mengambil data notifikasi awal
+      // Mengambil data notifikasi awal
       fetchNotifData(userId);
 
-      // [REALTIME SUPABASE]: Mendengarkan perubahan data pada tabel notifikasi secara langsung tanpa reload
+      // [LOGIKA REALTIME]: Mendengarkan perubahan data tabel notifikasi secara langsung
       channel = supabase
         .channel('realtime-notifikasi-panel')
         .on(
@@ -156,7 +156,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
     }
   };
 
-  // [PANGGIL HELPER AKSI]: Menjalankan fungsi helper saat tombol aksi notifikasi diklik
+  // [PERBAIKAN FUNGSI KLIK]: Menandai dibaca, menutup panel, lalu meneruskan objek notifikasi ke helper navigasi
   const handleItemClick = async (notif: NotifItem) => {
     await markAsRead(notif.id);
     onClose();
@@ -239,10 +239,10 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
                 <p className="text-xs sm:text-sm leading-relaxed mb-3">{notif.message}</p>
 
                 <div className="flex items-center justify-between pt-2 border-t border-gray-200/60 text-xs">
-                  {/* [NAVIGASI HELPER CALL]: Memanggil fungsi helper saat tombol diklik */}
+                  {/* Tombol Lihat Toko yang memanggil fungsi handleItemClick */}
                   <button
                     onClick={() => handleItemClick(notif)}
-                    className="text-amber-800 hover:text-amber-900 font-bold transition-colors flex items-center gap-1"
+                    className="text-amber-800 hover:text-amber-900 font-bold transition-colors flex items-center gap-1 cursor-pointer"
                   >
                     <i className="fa-solid fa-store"></i> Lihat Toko
                   </button>
