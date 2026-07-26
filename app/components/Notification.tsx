@@ -35,9 +35,9 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
       // Ambil data notifikasi awal
       fetchNotifData(userId);
 
-      // [REALTIME SUPABASE]: Mendengarkan perubahan data pada tabel notifikasi secara langsung tanpa reload
+      // [REALTIME SUPABASE]: Mendengarkan event INSERT tabel notifikasi secara langsung
       channel = supabase
-        .channel('realtime-notifikasi')
+        .channel('realtime-notifikasi-channel')
         .on(
           'postgres_changes',
           {
@@ -50,7 +50,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
             const newNotif = payload.new as NotifItem;
             setNotifs((prev) => [newNotif, ...prev]);
             
-            // Munculkan Flash Toast saat ada notifikasi baru masuk
+            // Tampilkan flash toast saat ada notifikasi masuk
             setFlashToast(newNotif.message);
             setTimeout(() => {
               setFlashToast(null);
@@ -81,11 +81,10 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
         setNotifs(data);
       }
     } catch (err: any) {
-      console.error('Gagal memuat notifikasi:', err.message);
+      console.error('Gagal memuat data notifikasi:', err.message);
     }
   };
 
-  // Tandai satu notifikasi telah dibaca
   const markAsRead = async (id: string) => {
     try {
       const { error } = await supabase
@@ -99,11 +98,10 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
         );
       }
     } catch (err: any) {
-      console.error('Gagal memperbarui status baca:', err.message);
+      console.error('Gagal menandai dibaca:', err.message);
     }
   };
 
-  // Tandai semua notifikasi telah dibaca
   const markAllAsRead = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -118,11 +116,10 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
         setNotifs((prev) => prev.map((n) => ({ ...n, is_read: true })));
       }
     } catch (err: any) {
-      console.error('Gagal memperbarui semua status baca:', err.message);
+      console.error('Gagal menandai semua dibaca:', err.message);
     }
   };
 
-  // Hapus satu notifikasi
   const deleteNotif = async (id: string) => {
     try {
       const { error } = await supabase
@@ -138,7 +135,6 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
     }
   };
 
-  // Hapus semua notifikasi
   const deleteAllNotifs = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -177,7 +173,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
-        {/* Header Panel Notifikasi */}
+        {/* Header Panel */}
         <div className="flex h-16 items-center justify-between px-6 border-b border-gray-200 bg-gray-50 flex-shrink-0">
           <h2 className="text-lg font-bold text-gray-800">Notifikasi</h2>
           <button 
@@ -188,7 +184,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
           </button>
         </div>
 
-        {/* Tombol Aksi Massal (Tandai Semua Dibaca & Hapus Semua) */}
+        {/* Tombol Aksi Massal */}
         {notifs.length > 0 && (
           <div className="flex items-center justify-between px-4 py-2.5 bg-gray-100 border-b border-gray-200 flex-shrink-0 text-xs">
             <button
@@ -206,7 +202,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
           </div>
         )}
 
-        {/* Daftar Isi Notifikasi (Scrollable) */}
+        {/* Daftar Isi Notifikasi */}
         <div className="p-4 overflow-y-auto flex-1 space-y-3">
           {notifs.length === 0 ? (
             <div className="text-center py-16 text-gray-400">
@@ -232,7 +228,6 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
                 </div>
                 <p className="text-xs sm:text-sm leading-relaxed mb-3">{notif.message}</p>
 
-                {/* Tombol Aksi Per Item Notifikasi */}
                 <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-200/60 text-xs">
                   {!notif.is_read && (
                     <button
@@ -255,7 +250,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
         </div>
       </div>
 
-      {/* [FLASH TOAST REAL-TIME]: Muncul otomatis di pojok kanan bawah saat ada notifikasi baru */}
+      {/* Flash Toast Real-Time */}
       {flashToast && (
         <div className="fixed bottom-6 right-6 z-[200] animate-bounce">
           <div className="flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl bg-amber-800 text-white font-medium border border-amber-700">
