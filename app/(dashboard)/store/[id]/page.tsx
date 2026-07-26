@@ -734,7 +734,7 @@ export default function StoreDetailPage() {
                             ? 'bg-orange-600 text-white' 
                             : 'bg-yellow-500 text-white'
                         }`}>
-                          {item.status === 'pemilik' ? 'toko/store saya' : item.status}
+                          {item.status === 'pemilik' ? 'pemilik' : item.status}
                         </span>
                       </div>
 
