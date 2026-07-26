@@ -50,40 +50,35 @@ export default function StorePage() {
     fetchData();
   }, []);
 
+  // [PERBAIKAN FUNGSI]: Mengoptimalkan pengambilan data secara independen
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Mengambil data kategori toko
+      // 1. Mengambil data kategori toko secara terpisah
       const { data: dataKategori, error: errorKategori } = await supabase
         .from('kategori_toko')
         .select('*')
         .order('nama', { ascending: true });
 
-      // [PENAMBAHAN DEBUGGING] Mencetak hasil pengambilan data kategori ke konsol peramban (browser)
-      console.log('--- DEBUGGING KATEGORI ---');
-      console.log('Data Kategori:', dataKategori);
-      console.log('Error Kategori:', errorKategori);
-      console.log('--------------------------');
+      if (errorKategori) {
+        console.error('Gagal memuat kategori:', errorKategori.message);
+      } else if (dataKategori) {
+        setKategoris(dataKategori);
+      }
 
-      if (errorKategori) throw errorKategori;
-      if (dataKategori) setKategoris(dataKategori);
-
-      // Mengambil data toko beserta relasi nama kategori
+      // 2. Mengambil data toko secara terpisah
       const { data: dataToko, error: errorToko } = await supabase
         .from('toko')
         .select('*, kategori_toko(nama)')
         .order('created_at', { ascending: false });
 
-      // [PENAMBAHAN DEBUGGING] Mencetak hasil pengambilan data toko
-      console.log('--- DEBUGGING TOKO ---');
-      console.log('Data Toko:', dataToko);
-      console.log('Error Toko:', errorToko);
-      console.log('----------------------');
-
-      if (errorToko) throw errorToko;
-      if (dataToko) setTokos(dataToko);
+      if (errorToko) {
+        console.error('Gagal memuat toko:', errorToko.message);
+      } else if (dataToko) {
+        setTokos(dataToko);
+      }
     } catch (error: any) {
-      alert('Gagal memuat data: ' + error.message);
+      console.error('Terjadi kesalahan sistem:', error.message);
     } finally {
       setLoading(false);
     }
