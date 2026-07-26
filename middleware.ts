@@ -1,9 +1,7 @@
-// middleware.ts
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
-  // Mengambil variabel lingkungan Supabase
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
@@ -36,30 +34,29 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Memeriksa sesi pengguna aktif
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  
-  // [PERBAIKAN KUNCI]: Memeriksa apakah URL memiliki parameter 'code' (OAuth callback dari Supabase/Google)
   const hasAuthCode = request.nextUrl.searchParams.has('code');
 
-  // Menentukan halaman publik yang boleh diakses tanpa login
   const isPublicRoute = path === '/login' || path === '/' || hasAuthCode;
 
-  // Pengamanan rute: Jika pengguna belum login dan mencoba mengakses halaman selain rute publik, lempar ke /login
+  
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
+    url.searchParams.set('next', path);
     return NextResponse.redirect(url);
   }
 
-  // Jika pengguna sudah login dan mencoba mengakses halaman /login (tetapi tidak sedang membawa callback code), arahkan ke /beranda
+ 
   if (user && path === '/login' && !hasAuthCode) {
+    const nextUrl = request.nextUrl.searchParams.get('next') || '/beranda';
     const url = request.nextUrl.clone();
-    url.pathname = '/beranda';
+    url.pathname = nextUrl;
+    url.searchParams.delete('next');
     return NextResponse.redirect(url);
   }
 
