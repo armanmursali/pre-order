@@ -1,23 +1,21 @@
-// app/(dashboard)/store/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
 
-// Mendefinisikan struktur data untuk Kategori Toko
+
 interface Kategori {
   id: string;
   nama: string;
 }
 
-// Mendefinisikan struktur data untuk Toko
+
 interface Toko {
   id: string;
   user_id: string;
   kategori_id: string;
   nama: string;
-  // [PERBAIKAN]: Menambahkan field deskripsi pada antarmuka Toko
   deskripsi?: string | null;
   foto: string | null;
   kategori_toko?: {
@@ -28,46 +26,55 @@ interface Toko {
 export default function StorePage() {
   const supabase = createClient();
   
-  // State untuk menyimpan daftar toko dan kategori
+
   const [tokos, setTokos] = useState<Toko[]>([]);
   const [kategoris, setKategoris] = useState<Kategori[]>([]);
-  
-  // State indikator proses
+
   const [loading, setLoading] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   
-  // State kontrol modal tambah/edit
+
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editId, setEditId] = useState<string | null>(null);
 
-  // State untuk mengontrol dropdown aksi (titik tiga)
+
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
-  // State untuk kontrol modal konfirmasi hapus khusus
+
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
   const [tokoToDelete, setTokoToDelete] = useState<Toko | null>(null);
   const [deleteInputName, setDeleteInputName] = useState<string>('');
   
-  // State data formulir
+ 
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+
   const [formData, setFormData] = useState({
     nama: '',
-    // [PERBAIKAN]: Menambahkan deskripsi ke dalam inisialisasi state form
     deskripsi: '',
     kategori_id: '',
     fileFoto: null as File | null,
     previewFoto: '' as string,
   });
 
-  // Mengambil data awal saat komponen dimuat
+ 
   useEffect(() => {
     fetchData();
   }, []);
 
-  // Mengoptimalkan pengambilan data secara independen
+ 
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(null);
+    }, 3000);
+  };
+
+
   const fetchData = async () => {
     setLoading(true);
     try {
-      // 1. Mengambil data kategori toko secara terpisah
+    
       const { data: dataKategori, error: errorKategori } = await supabase
         .from('kategori_toko')
         .select('*')
@@ -79,7 +86,7 @@ export default function StorePage() {
         setKategoris(dataKategori);
       }
 
-      // 2. Mengambil data toko secara terpisah
+
       const { data: dataToko, error: errorToko } = await supabase
         .from('toko')
         .select('*, kategori_toko(nama)')
@@ -97,13 +104,13 @@ export default function StorePage() {
     }
   };
 
-  // Menangani perubahan nilai input form
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Menangani pemilihan file foto baru
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -115,13 +122,12 @@ export default function StorePage() {
     }
   };
 
-  // Menutup modal form dan mereset data
+
   const closeModal = () => {
     setIsModalOpen(false);
     setEditId(null);
     setFormData({
       nama: '',
-      // [PERBAIKAN]: Mereset field deskripsi
       deskripsi: '',
       kategori_id: '',
       fileFoto: null,
@@ -129,12 +135,11 @@ export default function StorePage() {
     });
   };
 
-  // Membuka modal dalam mode edit data toko
+
   const openEditModal = (toko: Toko) => {
     setEditId(toko.id);
     setFormData({
       nama: toko.nama,
-      // [PERBAIKAN]: Mengisi data deskripsi untuk diedit
       deskripsi: toko.deskripsi || '',
       kategori_id: toko.kategori_id,
       fileFoto: null,
@@ -144,7 +149,7 @@ export default function StorePage() {
     setActiveDropdown(null); 
   };
 
-  // Fungsi untuk membuka modal konfirmasi hapus
+
   const openDeleteModal = (toko: Toko) => {
     setTokoToDelete(toko);
     setDeleteInputName(''); 
@@ -152,19 +157,19 @@ export default function StorePage() {
     setActiveDropdown(null); 
   };
 
-  // Fungsi untuk menutup modal konfirmasi hapus
+ 
   const closeDeleteModal = () => {
     setIsDeleteModalOpen(false);
     setTokoToDelete(null);
     setDeleteInputName('');
   };
 
-  // Menyimpan data toko dan mengunggah foto ke Supabase Storage
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.nama || !formData.kategori_id) {
-      alert('Nama dan Kategori wajib diisi!');
+      showToast('Nama dan Kategori wajib diisi!', 'error');
       return;
     }
 
@@ -176,7 +181,7 @@ export default function StorePage() {
 
       let fotoUrl = formData.previewFoto;
 
-      // Proses unggah file fisik ke Supabase Storage jika ada file baru
+     
       if (formData.fileFoto) {
         const fileExt = formData.fileFoto.name.split('.').pop();
         const fileName = `${session.user.id}-${Date.now()}.${fileExt}`;
@@ -188,7 +193,7 @@ export default function StorePage() {
 
         if (uploadError) throw uploadError;
 
-        // Mendapatkan URL publik dari Supabase Storage
+      
         const { data: publicUrlData } = supabase.storage
           .from('foto-toko')
           .getPublicUrl(filePath);
@@ -196,13 +201,12 @@ export default function StorePage() {
         fotoUrl = publicUrlData.publicUrl;
       }
 
-      // Logika pembaruan (Update) atau penambahan baru (Insert)
+     
       if (editId) {
         const { error } = await supabase
           .from('toko')
           .update({
             nama: formData.nama,
-            // [PERBAIKAN]: Menyertakan deskripsi saat update
             deskripsi: formData.deskripsi,
             kategori_id: formData.kategori_id,
             foto: fotoUrl,
@@ -211,6 +215,8 @@ export default function StorePage() {
           .eq('id', editId);
 
         if (error) throw error;
+      
+        showToast('Data toko berhasil diperbarui!', 'success');
       } else {
         const { error } = await supabase
           .from('toko')
@@ -218,24 +224,24 @@ export default function StorePage() {
             user_id: session.user.id,
             kategori_id: formData.kategori_id,
             nama: formData.nama,
-            // [PERBAIKAN]: Menyertakan deskripsi saat insert
             deskripsi: formData.deskripsi,
             foto: fotoUrl,
           });
 
         if (error) throw error;
+        showToast('Toko baru berhasil ditambahkan!', 'success');
       }
 
       closeModal();
       fetchData(); 
     } catch (error: any) {
-      alert('Gagal menyimpan data: ' + error.message);
+      showToast('Gagal menyimpan data: ' + error.message, 'error');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Fungsi eksekusi hapus yang dipanggil dari dalam Modal Hapus
+  
   const executeDelete = async () => {
     if (!tokoToDelete) return;
 
@@ -250,17 +256,20 @@ export default function StorePage() {
       
       closeDeleteModal();
       fetchData();
+    
+      showToast('Data toko berhasil dihapus secara permanen!', 'success');
     } catch (error: any) {
-      alert('Gagal menghapus data: ' + error.message);
+     
+      showToast('Gagal menghapus data: ' + error.message, 'error');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative">
       
-      {/* Overlay transparan untuk menutup dropdown aksi jika mengklik di luar area dropdown */}
+      
       {activeDropdown && (
         <div 
           className="fixed inset-0 z-[5]" 
@@ -282,7 +291,7 @@ export default function StorePage() {
         </button>
       </div>
 
-      {/* [PERBAIKAN]: Mengubah tampilan dari Tabel menjadi Grid Card */}
+     
       {loading ? (
         <div className="text-center py-12 text-gray-500">
           <i className="fa-solid fa-circle-notch fa-spin text-3xl mb-3 block text-orange-600"></i>
@@ -298,12 +307,11 @@ export default function StorePage() {
           {tokos.map((toko) => (
             <div key={toko.id} className="relative bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-orange-200 transition-all group flex flex-col overflow-hidden">
               
-              {/* [PERBAIKAN]: Area Aksi (Dropdown) ditempatkan secara absolut (mengambang) agar tidak memicu navigasi Link */}
               <div className="absolute top-3 right-3 z-10">
                 <div className="relative inline-block text-left">
                   <button
                     onClick={(e) => {
-                      e.preventDefault(); // Mencegah klik menyebar ke Link
+                      e.preventDefault();
                       e.stopPropagation();
                       setActiveDropdown(activeDropdown === toko.id ? null : toko.id);
                     }}
@@ -313,7 +321,6 @@ export default function StorePage() {
                     <i className="fa-solid fa-ellipsis-vertical"></i>
                   </button>
 
-                  {/* Konten Dropdown */}
                   {activeDropdown === toko.id && (
                     <div className="absolute right-0 mt-2 w-32 bg-white rounded-md shadow-lg border border-gray-200 z-20 py-1">
                       <button
@@ -341,9 +348,7 @@ export default function StorePage() {
                 </div>
               </div>
 
-              {/* [PERBAIKAN]: Sisa Card dibungkus dengan Link sehingga seluruh card dapat diklik untuk ke halaman detail */}
               <Link href={`/store/${toko.id}`} className="flex flex-col flex-grow outline-none focus:ring-2 focus:ring-orange-500 rounded-xl">
-                {/* Bagian Foto */}
                 <div className="h-48 w-full bg-gray-100 flex-shrink-0 relative">
                   {toko.foto ? (
                     <img src={toko.foto} alt={toko.nama} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
@@ -354,7 +359,6 @@ export default function StorePage() {
                   )}
                 </div>
                 
-                {/* Bagian Konten Teks */}
                 <div className="p-5 flex flex-col flex-grow">
                   <div className="flex flex-col gap-1 mb-3">
                     <span className="w-fit bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
@@ -365,7 +369,6 @@ export default function StorePage() {
                     </h3>
                   </div>
                   
-                  {/* [PERBAIKAN]: Menampilkan sebagian teks deskripsi pada card */}
                   <p className="text-sm text-gray-500 line-clamp-3 leading-relaxed">
                     {toko.deskripsi ? toko.deskripsi : <span className="italic">Tidak ada deskripsi.</span>}
                   </p>
@@ -376,7 +379,7 @@ export default function StorePage() {
         </div>
       )}
 
-      {/* Modal Form Tambah/Edit Toko */}
+ 
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
@@ -422,7 +425,6 @@ export default function StorePage() {
                   </select>
                 </div>
 
-                {/* [PERBAIKAN]: Menambahkan Textarea untuk input Deskripsi */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Deskripsi Toko (Opsional)</label>
                   <textarea
@@ -481,7 +483,7 @@ export default function StorePage() {
         </div>
       )}
 
-      {/* Modal Konfirmasi Hapus Khusus dengan Pengetikan Nama */}
+   
       {isDeleteModalOpen && tokoToDelete && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
@@ -528,6 +530,18 @@ export default function StorePage() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+    
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-[200] transition-all duration-300 ease-in-out">
+          <div className={`flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-xl text-white font-medium ${
+            toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+          }`}>
+            <i className={`fa-solid ${toast.type === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'} text-xl`}></i>
+            <span className="text-sm tracking-wide">{toast.message}</span>
           </div>
         </div>
       )}
