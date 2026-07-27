@@ -93,12 +93,40 @@ export default function BerandaPage() {
           .select('id, toko_id, nama, harga, foto, jenis_produk(nama), toko:toko_id(id, user_id, nama)')
           .in('toko_id', followedStoreIds)
           .order('created_at', { ascending: false })
-          .limit(20);
+          .limit(40);
 
-        if (prodData) {
+        if (prodData && prodData.length > 0) {
+        
+          const storeMap: { [key: string]: any[] } = {};
+          prodData.forEach((item: any) => {
+            const storeId = item.toko_id;
+            if (!storeMap[storeId]) {
+              storeMap[storeId] = [];
+            }
+            storeMap[storeId].push(item);
+          });
+
          
-          const shuffledProducts = [...prodData].sort(() => 0.5 - Math.random());
-          setFollowedProducts(shuffledProducts);
+          Object.keys(storeMap).forEach((storeId) => {
+            storeMap[storeId].sort(() => 0.5 - Math.random());
+          });
+
+          const storeKeys = Object.keys(storeMap).sort(() => 0.5 - Math.random());
+          const interleavedProducts: any[] = [];
+          let hasMore = true;
+
+     
+          while (hasMore) {
+            hasMore = false;
+            for (const storeId of storeKeys) {
+              if (storeMap[storeId].length > 0) {
+                interleavedProducts.push(storeMap[storeId].shift());
+                hasMore = true;
+              }
+            }
+          }
+
+          setFollowedProducts(interleavedProducts.slice(0, 20));
         } else {
           setFollowedProducts([]);
         }
