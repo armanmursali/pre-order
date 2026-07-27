@@ -33,10 +33,15 @@ interface PesananMasuk {
     nama: string;
     konfigurasi_pertanyaan?: any[];
   };
+  // [PERBAIKAN]: Menambahkan alias 'pembeli' untuk menampung data join eksplisit dari relasi pembeli_id ke users
+  pembeli?: {
+    nama?: string;
+    email?: string;
+  } | null;
   users?: {
     nama?: string;
     email?: string;
-  };
+  } | null;
 }
 
 export default function PesananMasukPage() {
@@ -57,14 +62,12 @@ export default function PesananMasukPage() {
   const [dynamicQuestionKeys, setDynamicQuestionKeys] = useState<string[]>([]);
   const [questionMap, setQuestionMap] = useState<Record<string, string>>({});
   
-  // [PERBAIKAN]: Mengganti 'nama_pembeli' menjadi 'email_pembeli'
   const [selectedColumns, setSelectedColumns] = useState<string[]>([
     'nomor_pesanan', 'email_pembeli', 'produk', 'jumlah', 'total_harga', 'status', 'aksi'
   ]);
   
   const [draggedCol, setDraggedCol] = useState<string | null>(null);
 
-  // [PERBAIKAN]: State untuk mengontrol Modal Aksi Proses (Terima / Tolak)
   const [actionModalVisible, setActionModalVisible] = useState<boolean>(false);
   const [selectedActionPesanan, setSelectedActionPesanan] = useState<PesananMasuk | null>(null);
   const [isProcessingAction, setIsProcessingAction] = useState<boolean>(false);
@@ -74,7 +77,6 @@ export default function PesananMasukPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  // [FUNGSI UTAMA]: Mengambil data pesanan dari server
   const fetchPesananMasuk = async () => {
     try {
       setLoading(true);
@@ -88,7 +90,7 @@ export default function PesananMasukPage() {
       const { data: tokoData, error: tokoError } = await supabase
         .from('toko')
         .select('id, nama')
-        .eq('user_id', session.user.id);
+        .or(`user_id.eq.${session.user.id},anggota.cs.[{"user_id":"${session.user.id}"}]`);
 
       if (tokoError) throw tokoError;
 
@@ -97,9 +99,11 @@ export default function PesananMasukPage() {
       if (tokoData && tokoData.length > 0) {
         const tokoIds = tokoData.map(t => t.id);
 
+        // [PERBAIKAN]: Menuliskan join eksplisit pembeli:users!pembeli_id(nama, email) 
+        // Ini memaksa Supabase mengenali relasi yang tepat tanpa ambiguitas
         const { data: pesananData, error: pesananError } = await supabase
           .from('pesanan')
-          .select('*, produk(nama, foto), toko(nama, konfigurasi_pertanyaan), users(nama, email)')
+          .select('*, produk(nama, foto), toko(nama, konfigurasi_pertanyaan), pembeli:users!pembeli_id(nama, email)')
           .in('toko_id', tokoIds)
           .order('nomor_pesanan', { ascending: true });
 
@@ -158,12 +162,12 @@ export default function PesananMasukPage() {
     }).format(date);
   };
 
-  // [PERBAIKAN LOGIC]: Mengambil Email, jika kosong memberikan fallback
+  // [PERBAIKAN]: Membaca relasi eksplisit pembeli, dan memberi pesan jelas jika RLS memblokir data
   const getEmailPembeli = (pesanan: PesananMasuk) => {
-    return pesanan.users?.email || 'Email tidak tersedia';
+    const email = pesanan.pembeli?.email || pesanan.users?.email;
+    return email ? email : 'Tidak tersedia (Terblokir RLS)';
   };
 
-  // [PERBAIKAN PENCARIAN]: Disesuaikan untuk mencari berdasarkan Email
   const pesananDitampilkan = daftarPesanan.filter(p => {
     const isTokoMatch = selectedTokoId === 'semua' || p.toko_id === selectedTokoId;
     
@@ -178,7 +182,7 @@ export default function PesananMasukPage() {
   const allPossibleCols = [
     { id: 'nomor_pesanan', label: 'No. Pesanan' },
     { id: 'toko', label: 'Toko' },
-    { id: 'email_pembeli', label: 'Email Pembeli' }, // [PERBAIKAN]: Label disesuaikan
+    { id: 'email_pembeli', label: 'Email Pembeli' }, 
     { id: 'telepon', label: 'Telepon' },
     { id: 'alamat', label: 'Alamat' },
     { id: 'produk', label: 'Produk' },
@@ -224,7 +228,6 @@ export default function PesananMasukPage() {
     setDraggedCol(null);
   };
 
-  // [FUNGSI BANTUAN EKSPOR]
   const getRawCellValue = (pesanan: PesananMasuk, colId: string): string => {
     switch (colId) {
       case 'nomor_pesanan': return String(pesanan.nomor_pesanan);
@@ -310,13 +313,11 @@ export default function PesananMasukPage() {
     }
   };
 
-  // [PERBAIKAN]: Fungsi untuk membuka modal aksi proses pesanan
   const handleOpenActionModal = (pesanan: PesananMasuk) => {
     setSelectedActionPesanan(pesanan);
     setActionModalVisible(true);
   };
 
-  // [PERBAIKAN]: Fungsi untuk menerima pesanan (Update Status ke 'Sudah Diterima')
   const handleTerimaPesanan = async () => {
     if (!selectedActionPesanan) return;
     setIsProcessingAction(true);
@@ -330,7 +331,6 @@ export default function PesananMasukPage() {
       
       showToast('Pesanan berhasil diterima dan status diperbarui', 'success');
       setActionModalVisible(false);
-      // Memuat ulang data agar tabel / card ter-update secara realtime
       fetchPesananMasuk(); 
     } catch (err: any) {
       showToast('Gagal memperbarui status: ' + err.message, 'error');
@@ -339,7 +339,6 @@ export default function PesananMasukPage() {
     }
   };
 
-  // [PERBAIKAN]: Fungsi untuk menolak pesanan (Hapus dari tabel 'pesanan')
   const handleTolakPesanan = async () => {
     if (!selectedActionPesanan) return;
     setIsProcessingAction(true);
@@ -353,7 +352,6 @@ export default function PesananMasukPage() {
       
       showToast('Pesanan berhasil ditolak dan dihapus dari sistem', 'success');
       setActionModalVisible(false);
-      // Memuat ulang data
       fetchPesananMasuk();
     } catch (err: any) {
       showToast('Gagal menghapus pesanan: ' + err.message, 'error');
@@ -369,7 +367,7 @@ export default function PesananMasukPage() {
       case 'toko':
         return <span className="font-semibold text-orange-700">{pesanan.toko?.nama}</span>;
       case 'email_pembeli':
-        return <span className="font-bold text-gray-800">{getEmailPembeli(pesanan)}</span>; // [PERBAIKAN]: Render email
+        return <span className="font-bold text-gray-800">{getEmailPembeli(pesanan)}</span>;
       case 'telepon':
         return pesanan.telepon_pembeli;
       case 'alamat':
@@ -402,7 +400,6 @@ export default function PesananMasukPage() {
                 <i className="fa-solid fa-image"></i>
               </button>
             )}
-            {/* [PERBAIKAN]: Membuka Modal Aksi saat diklik */}
             <button onClick={() => handleOpenActionModal(pesanan)} className="bg-amber-800 hover:bg-amber-900 text-white px-2 py-1 rounded text-xs font-bold transition-colors shadow-sm">
               <i className="fa-solid fa-pen"></i> Proses
             </button>
@@ -488,7 +485,7 @@ export default function PesananMasukPage() {
             </div>
             <input
               type="text"
-              placeholder="Cari pesanan berdasarkan email pembeli atau nomor pesanan..." // [PERBAIKAN]: Text Placeholder diubah
+              placeholder="Cari pesanan berdasarkan email pembeli atau nomor pesanan..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm bg-gray-50 text-gray-900 outline-none focus:bg-white focus:ring-2 focus:ring-orange-500 transition-all shadow-sm"
@@ -498,7 +495,7 @@ export default function PesananMasukPage() {
 
       </div>
 
-      {/* Konfigurasi Kolom Dinamis & Tombol Ekspor (Hanya muncul jika mode Tabel) */}
+      {/* Konfigurasi Kolom Dinamis & Tombol Ekspor */}
       {viewMode === 'table' && daftarPesanan.length > 0 && (
         <div className="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-gray-200 space-y-4">
           
@@ -652,7 +649,6 @@ export default function PesananMasukPage() {
                         <h4 className="text-xs font-bold text-gray-700 uppercase">Info Pembeli</h4>
                       </div>
                       <div className="text-xs text-gray-600 space-y-1">
-                        {/* [PERBAIKAN]: Menampilkan Email di tampilan Card */}
                         <p><span className="font-semibold text-gray-800">Email:</span> <span className="font-bold text-amber-900">{getEmailPembeli(pesanan)}</span></p>
                         <p><span className="font-semibold text-gray-800">Telepon:</span> {pesanan.telepon_pembeli}</p>
                         <p><span className="font-semibold text-gray-800">Alamat:</span> {pesanan.alamat_pembeli}</p>
@@ -704,7 +700,6 @@ export default function PesananMasukPage() {
                             <i className="fa-solid fa-image"></i> Cek Bukti
                           </button>
                         )}
-                        {/* [PERBAIKAN]: Membuka Modal Aksi */}
                         <button
                           className="flex-1 bg-amber-800 hover:bg-amber-900 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-sm flex items-center justify-center gap-1.5"
                           onClick={() => handleOpenActionModal(pesanan)}
@@ -722,7 +717,7 @@ export default function PesananMasukPage() {
         </>
       )}
 
-      {/* [PERBAIKAN]: Modal Konfirmasi Aksi (Terima / Tolak Pesanan) */}
+      {/* Modal Konfirmasi Aksi (Terima / Tolak Pesanan) */}
       {actionModalVisible && selectedActionPesanan && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-200 space-y-5 text-center relative">
