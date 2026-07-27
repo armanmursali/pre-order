@@ -161,7 +161,7 @@ export default function PublicProductDetailPage() {
     setShowConfirmModal(true);
   };
 
-  // [FUNGSI PROSES PEMESANAN / TRANSAKSI SEBENARNYA]: Menyimpan data pesanan ke database, simpan flash toast, dan redirect cepat ke /pesanan
+  // [FUNGSI PROSES PEMESANAN KETAT DI KODE]: Mengambil nomor pesanan berikutnya secara eksplisit per toko lalu melakukan insert
   const executeCheckout = async () => {
     if (!produk || isSubmitting) return;
 
@@ -170,6 +170,21 @@ export default function PublicProductDetailPage() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) throw new Error('Anda harus login terlebih dahulu.');
+
+      // [PENANGANAN KETAT NOMOR PESANAN PER TOKO]: Ambil nomor pesanan tertinggi saat ini untuk toko tersebut
+      const { data: existingPesanan, error: fetchOrderError } = await supabase
+        .from('pesanan')
+        .select('nomor_pesanan')
+        .eq('toko_id', produk.toko_id)
+        .order('nomor_pesanan', { ascending: false })
+        .limit(1);
+
+      if (fetchOrderError) throw fetchOrderError;
+
+      let nextNomorPesanan = 1;
+      if (existingPesanan && existingPesanan.length > 0 && existingPesanan[0].nomor_pesanan != null) {
+        nextNomorPesanan = Number(existingPesanan[0].nomor_pesanan) + 1;
+      }
 
       let buktiUrl = null;
 
@@ -198,6 +213,7 @@ export default function PublicProductDetailPage() {
 
       const totalHarga = produk.harga * jumlah;
 
+      // [INSERT DATA DENGAN NOMOR PESANAN EKSPLISIT]: Menyertakan nomor_pesanan hasil perhitungan ketat di kode
       const { error: insertError } = await supabase
         .from('pesanan')
         .insert({
@@ -211,6 +227,7 @@ export default function PublicProductDetailPage() {
           alamat_pembeli: alamatPembeli,
           telepon_pembeli: teleponPembeli,
           jawaban_pertanyaan: jawabanPertanyaan,
+          nomor_pesanan: nextNomorPesanan,
           status: 'Belum Diterima',
         });
 
