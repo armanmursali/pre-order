@@ -1,4 +1,3 @@
-// app/(dashboard)/pesanan-masuk/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -271,12 +270,12 @@ export default function PesananMasukPage() {
     }
   };
 
-  // [PERBAIKAN]: Menggunakan pemisah titik koma (;) agar Excel otomatis mendeteksi kolom secara terpisah tanpa menggumpal jadi satu kolom
+ 
   const handleExportExcel = () => {
     const colsToExport = activeColumns.filter(c => c.id !== 'aksi');
     if (colsToExport.length === 0) return showToast('Pilih setidaknya satu kolom untuk diekspor', 'error');
 
-    // Menggunakan pemisah titik koma (;) agar kompatibel sempurna dengan Excel regional Indonesia
+   
     const delimiter = ';';
 
     const headerRow = colsToExport.map(c => `"${c.label.replace(/"/g, '""')}"`).join(delimiter);
@@ -468,7 +467,7 @@ export default function PesananMasukPage() {
       
       <div className="space-y-4">
         
-        {/* Kotak 1: Judul, Toggle View Mode, & Dropdown Toko */}
+      
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl shadow-sm border border-gray-200">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center text-lg shadow-inner">
@@ -517,7 +516,7 @@ export default function PesananMasukPage() {
           </div>
         </div>
 
-        {/* Kotak 2: Container Pencarian Tersendiri */}
+      
         <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
           <div className="relative w-full">
             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -535,7 +534,7 @@ export default function PesananMasukPage() {
 
       </div>
 
-      {/* Konfigurasi Kolom Dinamis & Tombol Ekspor */}
+    
       {viewMode === 'table' && daftarPesanan.length > 0 && (
         <div className="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-gray-200 space-y-4">
           
@@ -755,7 +754,7 @@ export default function PesananMasukPage() {
             </div>
           )}
 
-          {/* Memanggil Komponen Paginator Terpisah */}
+         
           <Paginator 
             currentPage={currentPage}
             totalPages={totalPages}
@@ -882,7 +881,7 @@ export default function PesananMasukPage() {
         </div>
       )}
 
-      {/* Modal Preview Bukti Transfer */}
+      
       {previewBukti && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md" onClick={() => setPreviewBukti(null)}>
           <div className="relative max-w-2xl w-full max-h-[90vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
@@ -904,7 +903,7 @@ export default function PesananMasukPage() {
         </div>
       )}
 
-      {/* Komponen Toast */}
+     
       {toast && (
         <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[300] transition-all duration-300 ease-in-out">
           <div className={`flex items-center gap-2.5 sm:gap-3 px-4 sm:px-5 py-3 sm:py-3.5 rounded-xl shadow-xl text-white font-medium ${

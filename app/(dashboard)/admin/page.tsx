@@ -1,10 +1,9 @@
-// app/(dashboard)/admin/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
-import { sendNotification } from '@/utils/notificationHelper'; // [HELPER NOTIFIKASI REALTIME]: Mengirim pemberitahuan ke pengguna
+import { sendNotification } from '@/utils/notificationHelper'; 
 
 interface IzinTokoItem {
   id: string;
@@ -256,7 +255,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Modal Preview Bukti Transfer */}
+    
       {previewBukti && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md" onClick={() => setPreviewBukti(null)}>
           <div className="relative max-w-2xl w-full max-h-[90vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
@@ -278,7 +277,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Komponen Toast */}
+    
       {toast && (
         <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[300] transition-all duration-300 ease-in-out">
           <div className={`flex items-center gap-2.5 sm:gap-3 px-4 sm:px-5 py-3 sm:py-3.5 rounded-xl shadow-xl text-white font-medium ${

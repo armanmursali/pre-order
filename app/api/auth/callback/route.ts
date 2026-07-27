@@ -1,4 +1,3 @@
-// app/api/auth/callback/route.ts
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
@@ -43,20 +42,20 @@ export async function GET(request: Request) {
     if (!error && sessionData?.user) {
       const authUser = sessionData.user;
 
-      // [LOGIKA DIPERBAIKI]: Menggunakan metode upsert yang andal untuk memastikan password acak terisi di tabel users
+     
       try {
         const generateRandomPassword = () => {
           return Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2) + Date.now().toString(36);
         };
 
-        // 1. Cek dulu apakah data user sudah ada untuk mengambil password lamanya jika ada
+       
         const { data: existingUser } = await supabase
           .from('users')
           .select('password')
           .eq('id', authUser.id)
           .maybeSingle();
 
-        // 2. Jika password belum ada atau barisnya belum ada, lakukan upsert dengan password acak baru
+       
         if (!existingUser || !existingUser.password) {
           const randomPassword = generateRandomPassword();
           

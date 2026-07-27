@@ -1,4 +1,3 @@
-// app/(dashboard)/pendapatan/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -16,7 +15,7 @@ interface PesananItem {
   id: string;
   toko_id: string;
   total_harga: number;
-  metode_pilihan: string; // Contoh nilai: 'Tunai', 'Transfer'
+  metode_pilihan: string; 
   status: string;
   created_at: string;
   produk?: {
@@ -36,11 +35,11 @@ export default function PendapatanPage() {
   const [selectedTokoId, setSelectedTokoId] = useState<string>('semua');
   const [daftarPesanan, setDaftarPesanan] = useState<PesananItem[]>([]);
 
-  // State untuk Pagination
+
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(25);
 
-  // Mengambil data toko dan pesanan terkait
+ 
   const fetchPendapatanData = async () => {
     try {
       setLoading(true);
@@ -53,7 +52,7 @@ export default function PendapatanPage() {
 
       const userId = session.user.id;
 
-      // Mengambil toko milik user (pemilik atau anggota)
+    
       const { data: tokoData, error: tokoError } = await supabase
         .from('toko')
         .select('id, nama')
@@ -66,7 +65,7 @@ export default function PendapatanPage() {
       if (tokoData && tokoData.length > 0) {
         const tokoIds = tokoData.map(t => t.id);
 
-        // Mengambil semua pesanan dari toko-toko tersebut yang statusnya sudah diterima atau sukses
+       
         const { data: pesananData, error: pesananError } = await supabase
           .from('pesanan')
           .select('id, toko_id, total_harga, metode_pilihan, status, created_at, produk(nama), toko(nama)')
@@ -106,13 +105,11 @@ export default function PendapatanPage() {
     }).format(angka);
   };
 
-  // Filter pesanan berdasarkan toko yang dipilih
+
   const pesananFiltered = daftarPesanan.filter(p => {
     return selectedTokoId === 'semua' || p.toko_id === selectedTokoId;
   });
 
-  // Kalkulasi Total Pendapatan, Tunai, dan Transfer
-  // Catatan: Hanya menghitung pesanan yang sudah berstatus "Sudah Diterima" atau asumsikan semua pesanan masuk sukses (bisa disesuaikan filternya jika perlu)
   const totalPendapatan = pesananFiltered.reduce((acc, curr) => acc + Number(curr.total_harga || 0), 0);
   
   const pendapatanTunai = pesananFiltered
@@ -123,7 +120,7 @@ export default function PendapatanPage() {
     .filter(p => p.metode_pilihan?.toLowerCase() === 'transfer')
     .reduce((acc, curr) => acc + Number(curr.total_harga || 0), 0);
 
-  // Pagination Data
+
   const totalItems = pesananFiltered.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const paginatedPesanan = pesananFiltered.slice(
@@ -143,7 +140,7 @@ export default function PendapatanPage() {
   return (
     <div className="space-y-6 bg-white text-gray-900 min-h-screen p-0.5 sm:p-6">
       
-      {/* Header Halaman */}
+     
       <div className="rounded-xl bg-white p-6 shadow-sm border border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-amber-900 mb-1">
@@ -154,7 +151,7 @@ export default function PendapatanPage() {
           </p>
         </div>
 
-        {/* Dropdown Filter Toko */}
+       
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <label htmlFor="filterTokoPendapatan" className="text-xs font-semibold text-gray-600 whitespace-nowrap">
             Pilih Toko:
@@ -175,7 +172,7 @@ export default function PendapatanPage() {
         </div>
       </div>
 
-      {/* Kartu Informasi Ringkasan Pendapatan */}
+     
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         
         {/* Total Keseluruhan */}
@@ -272,7 +269,7 @@ export default function PendapatanPage() {
         )}
       </div>
 
-      {/* Komponen Paginator Terpisah */}
+      
       {totalItems > 0 && (
         <Paginator 
           currentPage={currentPage}

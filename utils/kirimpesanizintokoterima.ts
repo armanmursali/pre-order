@@ -1,10 +1,6 @@
-// utils/kirimpesanizintokoterima.ts
 import { createClient } from '@/utils/supabase/client';
 
-/**
- * [HELPER NOTIFIKASI IZIN TOKO DITERIMA]: Mengirimkan pesan pemberitahuan secara real-time
- * ke tabel notifikasi pengguna bahwa permohonan izin pembuatan toko mereka telah diterima oleh admin.
- */
+
 export async function kirimpesanizintokoterima(
   targetUserId: string,
   namaPemohon: string
@@ -37,7 +33,7 @@ export async function kirimpesanizintokoterima(
   }
 }
 
-// Fungsi pembantu internal untuk pemformatan nama
+
 function nama_pemohon(nama: string) {
   return nama || 'Pengguna';
 }

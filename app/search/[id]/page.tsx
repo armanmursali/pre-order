@@ -79,7 +79,7 @@ export default function PublicStoreDetailPage() {
       const userId = session.user.id;
       setCurrentUserId(userId);
 
-      // Ambil jumlah total follower toko
+    
       const { count, error: countError } = await supabase
         .from('follower_toko')
         .select('*', { count: 'exact', head: true })
@@ -89,7 +89,7 @@ export default function PublicStoreDetailPage() {
         setFollowerCount(count);
       }
 
-      // Cek apakah user sudah mengikuti toko ini
+    
       const { data: followData, error: followError } = await supabase
         .from('follower_toko')
         .select('id')
@@ -105,7 +105,7 @@ export default function PublicStoreDetailPage() {
     }
   };
 
-  // [FUNGSI TOGGLE FOLLOW / UNFOLLOW]: Menangani aksi ikuti dan berhenti mengikuti toko
+ 
   const handleToggleFollow = async () => {
     if (!toko || !currentUserId) return;
     if (toko.user_id === currentUserId) {
@@ -116,7 +116,7 @@ export default function PublicStoreDetailPage() {
     setIsProcessingFollow(true);
     try {
       if (isFollowing) {
-        // Unfollow
+       
         const { error } = await supabase
           .from('follower_toko')
           .delete()
@@ -129,7 +129,7 @@ export default function PublicStoreDetailPage() {
         setFollowerCount((prev) => Math.max(0, prev - 1));
         showToast('Berhenti mengikuti toko.', 'success');
       } else {
-        // Follow
+       
         const { error } = await supabase
           .from('follower_toko')
           .insert([{ id_toko: toko.id, id_users: currentUserId }]);
@@ -147,12 +147,12 @@ export default function PublicStoreDetailPage() {
     }
   };
 
-  // [FUNGSI AMBIL DATA PUBLIK]: Mengambil data informasi toko (termasuk konfigurasi pertanyaan kustom) dan produknya
+ 
   const fetchPublicStoreData = async (tokoId: string) => {
     try {
       setLoading(true);
 
-      // 1. Ambil informasi detail toko beserta konfigurasi_pertanyaan
+     
       const { data: dataToko, error: errorToko } = await supabase
         .from('toko')
         .select('*, kategori_toko(nama)')
@@ -167,7 +167,7 @@ export default function PublicStoreDetailPage() {
 
       setToko(dataToko);
 
-      // 2. Ambil daftar produk yang dijual di toko tersebut
+      
       const { data: dataProduk } = await supabase
         .from('produk')
         .select('*, jenis_produk(nama)')
@@ -199,7 +199,7 @@ export default function PublicStoreDetailPage() {
 
   return (
     <div className="space-y-6 relative p-2 sm:p-6 bg-white text-gray-900 min-h-screen">
-      {/* Tombol Kembali ke Beranda */}
+     
       <div className="flex items-center gap-3">
         <button
           onClick={() => router.push('/beranda')}
@@ -211,7 +211,7 @@ export default function PublicStoreDetailPage() {
         <h1 className="text-xl font-bold text-amber-900">Kunjungan Toko</h1>
       </div>
 
-      {/* Bagian Detail Informasi Toko (Read-Only untuk Pengunjung) */}
+    
       <div className="bg-white text-gray-900 rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-200 flex items-center justify-between bg-orange-50/30">
           <h2 className="text-base sm:text-lg font-bold text-amber-900">Informasi Toko</h2>
@@ -238,7 +238,7 @@ export default function PublicStoreDetailPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
               <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900">{toko.nama}</h2>
 
-              {/* [TOMBOL IKUTI TOKO]: Tombol Follow/Unfollow & Info Jumlah Pengikut (Disembunyikan jika milik sendiri) */}
+              
               {currentUserId && toko.user_id !== currentUserId && (
                 <div className="flex items-center gap-3">
                   <span className="text-xs text-gray-500 font-medium">
@@ -285,7 +285,7 @@ export default function PublicStoreDetailPage() {
                 </p>
               </div>
 
-              {/* Informasi Kontak, Alamat, Rekening, dan Metode Pembayaran */}
+             
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 bg-white">
                 <div className="p-3.5 sm:p-4 bg-white rounded-xl border border-gray-200">
                   <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Nomor Telepon / WhatsApp</p>
@@ -324,7 +324,7 @@ export default function PublicStoreDetailPage() {
         </div>
       </div>
 
-      {/* Bagian Daftar Produk Toko */}
+     
       <div className="bg-white text-gray-900 rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
         <div className="mb-4 sm:mb-6 border-b border-gray-100 pb-3.5 sm:pb-4 bg-white">
           <h2 className="text-lg sm:text-xl font-bold text-amber-900">Produk yang Dijual</h2>
@@ -339,7 +339,7 @@ export default function PublicStoreDetailPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 bg-white">
             {produks.map((produk) => (
-              /* [PENYESUAIAN NAVIGASI PRODUK PUBLIK]: Mengarahkan ke /search-produk/[id] saat produk diklik */
+             
               <Link
                 key={produk.id}
                 href={`/search-produk/${produk.id}`}
@@ -372,7 +372,7 @@ export default function PublicStoreDetailPage() {
         )}
       </div>
 
-      {/* Modal Preview Gambar */}
+   
       {previewImageUrl && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md" onClick={() => setPreviewImageUrl(null)}>
           <div className="relative max-w-4xl w-full max-h-[90vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>

@@ -1,4 +1,3 @@
-// app/page.tsx
 'use client';
 
 import React, { useState } from 'react';
@@ -9,13 +8,13 @@ import { useRouter } from 'next/navigation';
 export default function Home() {
   const router = useRouter();
   
-  // [STATE POPUP LOGIN]: Mengontrol visibilitas popup login promosi
+ 
   const [isPopupOpen, setIsPopupOpen] = useState<boolean>(true);
 
   return (
     <div className="flex flex-col flex-1 min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-white font-sans text-gray-900 relative overflow-x-hidden">
       
-      {/* Header / Navigasi Utama Landing Page */}
+    
       <header className="w-full max-w-6xl mx-auto px-6 py-6 flex items-center justify-between z-10">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-amber-800 text-white rounded-xl flex items-center justify-center font-bold text-lg shadow-md">
@@ -42,10 +41,10 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Bagian Utama Hero Section Landing Page */}
+     
       <main className="flex flex-1 w-full max-w-6xl mx-auto flex-col lg:flex-row items-center justify-between py-12 px-6 gap-12 z-10">
         
-        {/* Kolom Kiri: Teks Promosi, Quote, & Slogan */}
+       
         <div className="flex flex-col items-center lg:items-start gap-6 text-center lg:text-left max-w-xl">
           <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-100 text-orange-800 text-xs font-bold tracking-wide animate-pulse">
             <i className="fa-solid fa-store"></i> Platform Pre-Order Terpercaya
@@ -59,7 +58,7 @@ export default function Home() {
             Selamat datang di <strong className="text-amber-900">Pre-Order PT Mances</strong>. Solusi efisien untuk memenuhi segala kebutuhan pasokan harian Anda secara cepat, aman, dan transparan langsung dari genggaman.
           </p>
 
-          {/* Quote Menarik */}
+         
           <blockquote className="border-l-4 border-amber-800 pl-4 py-1 italic text-sm sm:text-base text-gray-700 bg-amber-50/50 rounded-r-xl w-full text-left shadow-sm">
             &ldquo;Efisiensi adalah kunci kesuksesan bisnis harian Anda. Bersama PT Mances, semua kebutuhan terpenuhi tanpa kompromi.&rdquo;
             <span className="block not-italic font-bold text-xs text-amber-900 mt-1">— Manajemen PT Mances</span>
@@ -83,12 +82,12 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Kolom Kanan: Ilustrasi Gambar Kartun Vektor dari Sumber Daring */}
+       
         <div className="w-full lg:w-1/2 flex items-center justify-center relative">
           <div className="absolute w-72 h-72 sm:w-96 sm:h-96 bg-orange-200/50 rounded-full blur-3xl -z-10 animate-blob"></div>
           
           <div className="relative w-full max-w-md aspect-square rounded-3xl overflow-hidden shadow-2xl border-4 border-white transform hover:scale-[1.02] transition-transform duration-500 bg-amber-100 flex items-center justify-center">
-            {/* [PENGGANTIAN GAMBAR KARTUN]: Menggunakan ilustrasi vektor/kartun belanja dari unDraw/Open Source SVG */}
+          
             <img
               src="https://img.freepik.com/free-vector/online-grocery-shopping-concept-illustration_114360-14861.jpg?w=800"
               alt="Ilustrasi Kartun Belanja Harian PT Mances"
@@ -103,12 +102,12 @@ export default function Home() {
 
       </main>
 
-      {/* Footer Sederhana */}
+     
       <footer className="w-full border-t border-gray-200 py-6 text-center text-xs text-gray-500 bg-white/50 backdrop-blur-sm z-10">
         &copy; {new Date().getFullYear()} Pre-Order PT Mances. Hak Cipta Dilindungi Undang-Undang.
       </footer>
 
-      {/* [POPUP LOGIN INTERAKTIF]: Dapat diabaikan atau diarahkan ke /login */}
+      
       {isPopupOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl border border-gray-100 text-center relative space-y-6 transform animate-scale-up">

@@ -68,7 +68,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
             filter: `user_id=eq.${userId}`,
           },
           (payload) => {
-            // Sinkronisasi state lokal secara real-time saat ada notifikasi yang dihapus
+           
             const deletedId = payload.old.id;
             setNotifs((prev) => prev.filter((n) => n.id !== deletedId));
           }
@@ -100,7 +100,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
     };
   }, []);
 
-  // [FUNGSI AMBIL DATA]: Mengambil data awal notifikasi dari database
+ 
   const fetchNotifData = async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -117,7 +117,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
     }
   };
 
-  // [FUNGSI TANDAI DIBACA]: Mengubah status is_read menjadi true pada database
+  
   const markAsRead = async (id: string) => {
     try {
       const { error } = await supabase
@@ -135,7 +135,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
     }
   };
 
-  // [FUNGSI TANDAI SEMUA DIBACA]: Mengubah seluruh status notifikasi aktif menjadi dibaca
+ 
   const markAllAsRead = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -154,7 +154,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
     }
   };
 
-  // [FUNGSI HAPUS NOTIFIKASI]: Menghapus satu notifikasi secara permanen dari database
+  
   const deleteNotif = async (id: string) => {
     try {
       const { error } = await supabase
@@ -170,7 +170,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
     }
   };
 
-  // [FUNGSI HAPUS SEMUA]: Menghapus seluruh riwayat notifikasi pengguna
+ 
   const deleteAllNotifs = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -189,14 +189,14 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
     }
   };
 
-  // [FUNGSI KLIK ITEM]: Menangani aksi navigasi dan penandaan dibaca
+ 
   const handleItemClick = async (notif: NotifItem) => {
     await markAsRead(notif.id);
     onClose();
     handleNotificationClick(notif, router);
   };
 
-  // [FORMAT WAKTU]: Format tanggal dan jam ramah pengguna
+  
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' - ' + date.toLocaleDateString();
@@ -211,13 +211,13 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
         />
       )}
 
-      {/* Panel Notifikasi */}
+    
       <div
         className={`fixed top-0 right-0 h-full bg-white shadow-2xl z-[70] transition-transform duration-300 ease-in-out w-full md:w-96 flex flex-col ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
-        {/* Header Panel Notifikasi */}
+        
         <div className="flex h-16 items-center justify-between px-6 border-b border-gray-200 bg-gray-50 flex-shrink-0">
           <h2 className="text-lg font-bold text-gray-800">Notifikasi</h2>
           <button 
@@ -228,7 +228,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
           </button>
         </div>
 
-        {/* Tombol Aksi Massal */}
+       
         {notifs.length > 0 && (
           <div className="flex items-center justify-between px-4 py-2.5 bg-gray-100 border-b border-gray-200 flex-shrink-0 text-xs">
             <button
@@ -246,7 +246,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
           </div>
         )}
 
-        {/* Daftar Isi Notifikasi (Scrollable) */}
+       
         <div className="p-4 overflow-y-auto flex-1 space-y-3">
           {notifs.length === 0 ? (
             <div className="text-center py-16 text-gray-400">
@@ -303,7 +303,7 @@ export default function Notification({ isOpen, onClose }: NotificationProps) {
         </div>
       </div>
 
-      {/* [PERBAIKAN POSISI TOAST]: Flash Toast diposisikan di atas layar (top-6 right-6) */}
+     
       {flashToast && (
         <div className="fixed top-6 right-6 z-[200] animate-bounce">
           <div className="flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-2xl bg-amber-800 text-white font-medium border border-amber-700">

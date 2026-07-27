@@ -1,4 +1,3 @@
-// app/(dashboard)/pesanan/page.tsx
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -39,7 +38,7 @@ export default function PesananPage() {
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // State untuk Pagination
+
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(25);
 
@@ -110,7 +109,7 @@ export default function PesananPage() {
     }).format(angka);
   };
 
-  // Kalkulasi data untuk Pagination
+
   const totalItems = pesananList.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const paginatedPesanan = pesananList.slice(
@@ -129,7 +128,7 @@ export default function PesananPage() {
 
   return (
     <div className="space-y-6 bg-white text-gray-900 min-h-screen p-0.5 sm:p-6">
-      {/* Header Halaman Pesanan */}
+      
       <div className="rounded-xl bg-white p-6 shadow-sm border border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-amber-900 mb-1">
@@ -148,7 +147,7 @@ export default function PesananPage() {
         </Link>
       </div>
 
-      {/* Daftar Pesanan */}
+     
       {pesananList.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl border border-gray-200 text-gray-500 shadow-sm">
           <i className="fa-solid fa-receipt text-4xl mb-3 text-gray-300 block"></i>
@@ -169,7 +168,7 @@ export default function PesananPage() {
                 key={item.id} 
                 className="bg-white border border-gray-200 rounded-xl shadow-sm hover:border-orange-200 transition-all p-4 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6"
               >
-                {/* Bagian Kiri: Info Produk & Toko */}
+               
                 <div className="flex items-start gap-4 flex-grow w-full md:w-auto">
                   <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center border border-gray-200 cursor-pointer" onClick={() => item.produk?.foto && setPreviewImageUrl(item.produk.foto)}>
                     {item.produk?.foto ? (
@@ -203,7 +202,7 @@ export default function PesananPage() {
                   </div>
                 </div>
 
-                {/* Bagian Kanan: Status & Bukti Transfer (Tombol Batalkan Pesanan telah dikeluarkan/dihapus sesuai instruksi) */}
+               
                 <div className="flex flex-col sm:flex-row md:flex-col items-end justify-between w-full md:w-auto gap-3 border-t md:border-t-0 pt-3 md:pt-0 border-gray-100">
                   
                   <div className="flex flex-col items-end gap-2 w-full">
@@ -251,7 +250,7 @@ export default function PesananPage() {
         </>
       )}
 
-      {/* Modal Preview Gambar */}
+     
       {previewImageUrl && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md" onClick={() => setPreviewImageUrl(null)}>
           <div className="relative max-w-4xl w-full max-h-[90vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
@@ -271,7 +270,7 @@ export default function PesananPage() {
         </div>
       )}
 
-      {/* Komponen Toast */}
+    
       {toast && (
         <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[200] transition-all duration-300 ease-in-out">
           <div className={`flex items-center gap-2.5 sm:gap-3 px-4 sm:px-5 py-3 sm:py-3.5 rounded-xl shadow-xl text-white font-medium ${

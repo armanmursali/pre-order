@@ -1,9 +1,6 @@
-// utils/notificationHelper.ts
 import { createClient } from '@/utils/supabase/client';
 
-/**
- * [HELPER NOTIFIKASI]: Mengirim notifikasi baru ke database Supabase secara instan dan real-time
- */
+
 export async function sendNotification(userId: string, title: string, message: string) {
   try {
     const supabase = createClient();

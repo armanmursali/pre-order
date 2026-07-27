@@ -1,4 +1,3 @@
-// app/(dashboard)/search-produk/[id]/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -39,7 +38,7 @@ export default function PublicProductDetailPage() {
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // [STATE TRANSAKSI]: Kuantitas, Alamat, Telepon, Metode Pembayaran, Bukti Transfer, & Jawaban Pertanyaan Kustom
+ 
   const [jumlah, setJumlah] = useState<number>(1);
   const [alamatPembeli, setAlamatPembeli] = useState<string>('');
   const [teleponPembeli, setTeleponPembeli] = useState<string>('');
@@ -48,11 +47,11 @@ export default function PublicProductDetailPage() {
   const [previewBukti, setPreviewBukti] = useState<string>('');
   const [jawabanPertanyaan, setJawabanPertanyaan] = useState<{ [key: string]: string }>({});
 
-  // [STATE MODAL KONFIRMASI & HITUNG MUNDUR 5 DETIK]
+
   const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
   const [countdown, setCountdown] = useState<number>(5);
 
-  // [LOGIKA PRESISI]: Mengambil ID parameter rute secara aman dan sinkron
+
   useEffect(() => {
     const resolveParams = async () => {
       if (params && params.id) {
@@ -65,7 +64,7 @@ export default function PublicProductDetailPage() {
     resolveParams();
   }, [params]);
 
-  // [EFEK HITUNG MUNDUR MODAL]: Mengatur jeda waktu 5 detik agar tombol konfirmasi aktif
+
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (showConfirmModal && countdown > 0) {
@@ -89,7 +88,7 @@ export default function PublicProductDetailPage() {
     }).format(angka);
   };
 
-  // [FUNGSI AMBIL DATA PRODUK PUBLIK]: Mengambil detail produk beserta informasi toko dan konfigurasi pertanyaannya dari Supabase
+ 
   const fetchPublicProductData = async (targetId: string) => {
     try {
       setLoading(true);
@@ -115,7 +114,7 @@ export default function PublicProductDetailPage() {
         }
       }
 
-      // Inisialisasi awal state jawaban pertanyaan kustom jika ada
+     
       if (dataProduk.toko?.konfigurasi_pertanyaan && Array.isArray(dataProduk.toko.konfigurasi_pertanyaan)) {
         const initialAnswers: { [key: string]: string } = {};
         dataProduk.toko.konfigurasi_pertanyaan.forEach((item: any) => {
@@ -130,7 +129,7 @@ export default function PublicProductDetailPage() {
     }
   };
 
-  // [FUNGSI INTERSEPSI SUBMIT]: Validasi awal sebelum memunculkan modal konfirmasi
+ 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!produk || isSubmitting) return;
@@ -140,7 +139,7 @@ export default function PublicProductDetailPage() {
       return;
     }
 
-    // Validasi pertanyaan kustom wajib diisi
+   
     if (produk.toko?.konfigurasi_pertanyaan && Array.isArray(produk.toko.konfigurasi_pertanyaan)) {
       for (const item of produk.toko.konfigurasi_pertanyaan) {
         const key = item.id || item.pertanyaan;
@@ -156,12 +155,12 @@ export default function PublicProductDetailPage() {
       return;
     }
 
-    // Buka modal konfirmasi dan reset hitung mundur ke 5 detik
+   
     setCountdown(5);
     setShowConfirmModal(true);
   };
 
-  // [FUNGSI PROSES PEMESANAN / TRANSAKSI]: Menyimpan data pesanan (nomor_pesanan otomatis di-handle oleh database trigger)
+ 
   const executeCheckout = async () => {
     if (!produk || isSubmitting) return;
 
@@ -173,7 +172,7 @@ export default function PublicProductDetailPage() {
 
       let buktiUrl = null;
 
-      // Jika memilih metode transfer, unggah bukti transfer ke storage bucket 'bukti-transfer'
+    
       if (metodePilihan === 'Transfer') {
         if (!fileBukti) {
           throw new Error('Silakan unggah bukti transfer terlebih dahulu.');
@@ -198,7 +197,7 @@ export default function PublicProductDetailPage() {
 
       const totalHarga = produk.harga * jumlah;
 
-      // [INSERT DATA KE DATABASE]: Mengirim data transaksi tanpa perlu menyertakan nomor_pesanan secara manual
+      
       const { error: insertError } = await supabase
         .from('pesanan')
         .insert({
@@ -217,7 +216,7 @@ export default function PublicProductDetailPage() {
 
       if (insertError) throw insertError;
 
-      // [PENGALIHAN CEPAT KE /pesanan DENGAN FLASH TOAST]: Menyimpan pesan sukses dan langsung redirect tanpa jeda
+      
       localStorage.setItem('flash_toast', 'Pesanan berhasil dibuat! Status: Belum Diterima pemilik.');
       router.push('/pesanan');
     } catch (error: any) {
@@ -253,7 +252,7 @@ export default function PublicProductDetailPage() {
 
   return (
     <div className="space-y-6 relative p-0.5 sm:p-6 bg-white text-gray-900 min-h-screen">
-      {/* Tombol Kembali ke Beranda */}
+     
       <div className="flex items-center gap-3">
         <button
           onClick={() => router.push('/beranda')}
@@ -265,10 +264,10 @@ export default function PublicProductDetailPage() {
         <h1 className="text-xl font-bold text-amber-900">Detail Produk & Pembayaran</h1>
       </div>
 
-      {/* [TATA LETAK 2 KOLOM]: Kolom Kiri untuk Detail Produk, Kolom Kanan untuk Proses Pembayaran */}
+   
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start max-w-7xl mx-auto">
         
-        {/* KOLOM KIRI: Detail Produk & Informasi Toko */}
+       
         <div className="bg-white text-gray-900 rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="px-4 sm:px-5 py-3 border-b border-gray-200 flex items-center justify-between bg-orange-50/30">
             <span className="bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
@@ -301,7 +300,7 @@ export default function PublicProductDetailPage() {
               </div>
             </div>
 
-            {/* Informasi Toko Penjual Produk */}
+          
             <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-200 space-y-2 text-xs">
               <h3 className="font-bold text-gray-500 uppercase tracking-wider">Informasi Penjual / Toko</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -332,7 +331,7 @@ export default function PublicProductDetailPage() {
           </div>
         </div>
 
-        {/* KOLOM KANAN: Formulir Pesanan & Proses Pembayaran */}
+       
         <div className="bg-white text-gray-900 rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="px-4 sm:px-5 py-3 border-b border-gray-200 bg-orange-50/30">
             <h3 className="text-base font-bold text-amber-900 flex items-center gap-2">
@@ -344,7 +343,7 @@ export default function PublicProductDetailPage() {
           <div className="p-4 sm:p-6 bg-white">
             <form onSubmit={handleFormSubmit} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Jumlah / Kuantitas Pesanan */}
+              
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">Jumlah Pembelian</label>
                   <input
@@ -357,7 +356,7 @@ export default function PublicProductDetailPage() {
                   />
                 </div>
 
-                {/* Total Harga Dinamis */}
+                
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">Total Harga Dinamis</label>
                   <div className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-xs sm:text-sm font-bold text-amber-900 flex items-center">
@@ -366,7 +365,7 @@ export default function PublicProductDetailPage() {
                 </div>
               </div>
 
-              {/* [FIELD WAJIB]: Nomor Telepon Pembeli */}
+             
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">Nomor Telepon / WhatsApp <span className="text-red-500">*</span></label>
                 <input
@@ -379,7 +378,7 @@ export default function PublicProductDetailPage() {
                 />
               </div>
 
-              {/* [FIELD WAJIB]: Alamat Lengkap Pembeli */}
+              
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">Alamat Lengkap Pengiriman <span className="text-red-500">*</span></label>
                 <textarea
@@ -392,7 +391,7 @@ export default function PublicProductDetailPage() {
                 ></textarea>
               </div>
 
-              {/* [RENDER PERTANYAAN KUSTOM DARI TOKO]: Render dinamis berdasarkan konfigurasi toko (teks / radio button) */}
+            
               {produk.toko?.konfigurasi_pertanyaan && produk.toko.konfigurasi_pertanyaan.length > 0 && (
                 <div className="p-4 bg-orange-50/40 rounded-xl border border-orange-200 space-y-3">
                   <h4 className="text-xs font-bold text-amber-900 uppercase tracking-wider">Pertanyaan Tambahan dari Toko</h4>
@@ -437,7 +436,7 @@ export default function PublicProductDetailPage() {
                 </div>
               )}
 
-              {/* Pilihan Jenis Pembayaran */}
+            
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">Pilih Metode Pembayaran</label>
                 <select
@@ -450,7 +449,7 @@ export default function PublicProductDetailPage() {
                 </select>
               </div>
 
-              {/* Jika Memilih Transfer: Tampil Informasi Rekening & Upload Bukti Transfer */}
+              
               {metodePilihan === 'Transfer' && (
                 <div className="p-4 bg-gray-50 rounded-xl border border-orange-200 space-y-3">
                   <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900">
@@ -482,7 +481,7 @@ export default function PublicProductDetailPage() {
                 </div>
               )}
 
-              {/* [PENGAMAN TOMBOL KIRIM]: Tombol dikunci (disabled) jika isSubmitting bernilai true */}
+             
               <div className="pt-2 flex justify-end">
                 <button
                   type="submit"
@@ -504,7 +503,7 @@ export default function PublicProductDetailPage() {
 
       </div>
 
-      {/* [MODAL KONFIRMASI PESANAN]: Muncul saat tombol kirim ditekan dengan jeda hitung mundur 5 detik */}
+      
       {showConfirmModal && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-200 space-y-4 text-center">

@@ -1,4 +1,3 @@
-// app/(dashboard)/layout.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -22,7 +21,7 @@ export default function DashboardLayout({
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState<number>(0);
   
-  // [STATE ADMIN]: State untuk memvalidasi apakah user yang login merupakan seorang admin
+ 
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
   useEffect(() => {
@@ -35,7 +34,7 @@ export default function DashboardLayout({
       if (session?.user) {
         const userId = session.user.id;
 
-        // [PENGECEKAN STATUS ADMIN]: Validasi apakah user terdaftar di tabel admin
+       
         const { data: adminData } = await supabase
           .from('admin')
           .select('id')
@@ -70,7 +69,7 @@ export default function DashboardLayout({
 
         fetchUnread();
 
-        // [REALTIME DUA ARAH LAYOUT]: Mendengarkan seluruh event INSERT, UPDATE, dan DELETE pada tabel notifikasi agar badge angka hilang real-time saat dihapus/dibaca
+      
         channel = supabase
           .channel(`layout-notif-realtime-sync-${userId}`)
           .on(
@@ -135,7 +134,7 @@ export default function DashboardLayout({
 
         <nav className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
           {navMenus.map((menu) => {
-            // [VALIDASI MENU ADMIN]: Sembunyikan menu Admin jika user aktif bukan admin
+           
             if (menu.href === '/admin' && !isAdmin) {
               return null;
             }
@@ -145,14 +144,14 @@ export default function DashboardLayout({
               <Link
                 key={menu.name}
                 href={menu.href}
-                // [OTOMATIS TUTUP SIDEBAR MOBILE]: Menambahkan event onClick untuk menutup sidebar setelah berpindah menu di perangkat seluler
+                
                 onClick={() => setSidebarOpen(false)}
                 className={`flex items-center rounded-xl text-sm font-medium transition-all ${
                   isDesktopCollapsed ? 'justify-center py-3' : 'gap-3 px-4 py-2.5'
                 } ${
                   isActive
-                    ? 'bg-amber-800 text-white shadow-sm font-bold' // [TEMA ORANYE TUA & COKELAT]: Warna aktif menu
-                    : 'text-gray-600 hover:bg-orange-50 hover:text-amber-900' // [TEMA ORANYE TUA & COKELAT]: Warna hover menu
+                    ? 'bg-amber-800 text-white shadow-sm font-bold' 
+                    : 'text-gray-600 hover:bg-orange-50 hover:text-amber-900' 
                 }`}
                 title={isDesktopCollapsed ? menu.name : undefined}
               >
@@ -199,7 +198,7 @@ export default function DashboardLayout({
           </div>
 
           <div className="flex items-center gap-5 ml-auto">
-            {/* Tombol Lonceng Notifikasi dengan Badge Real-Time */}
+           
             <button 
               onClick={() => setIsNotifOpen(true)}
               className="relative text-gray-500 hover:text-amber-900 transition-colors focus:outline-none"

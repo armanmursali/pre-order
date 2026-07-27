@@ -1,4 +1,3 @@
-// app/(dashboard)/store/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -49,7 +48,7 @@ export default function StorePage() {
 
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // [STATE IZIN BUAT TOKO]: Mengontrol status izin pembuatan toko pengguna aktif
+  
   const [izinStatus, setIzinStatus] = useState<string | null>(null); // 'pending', 'diterima', 'ditolak', atau null
   const [izinData, setIzinData] = useState<any | null>(null);
   const [isIzinModalOpen, setIsIzinModalOpen] = useState<boolean>(false);
@@ -104,7 +103,7 @@ export default function StorePage() {
     };
   }, []);
 
-  // [FUNGSI CEK STATUS IZIN]: Memeriksa apakah user sudah mengajukan izin buat toko
+  
   const checkIzinStatus = async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -205,7 +204,7 @@ export default function StorePage() {
     }
   };
 
-  // [FUNGSI KIRIM FORMULIR IZIN PEMBUATAN TOKO]
+ 
   const handleIzinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!izinForm.nama_lengkap || !izinForm.telepon || !izinForm.fileBukti) {
@@ -223,7 +222,7 @@ export default function StorePage() {
       const filePath = `public/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('foto-toko') // Menggunakan bucket foto-toko untuk bukti transfer izin
+        .from('foto-toko') 
         .upload(filePath, izinForm.fileBukti);
 
       if (uploadError) throw uploadError;
@@ -493,7 +492,7 @@ export default function StorePage() {
             <span>Gabung Toko</span>
           </button>
           
-          {/* [VALIDASI TOMBOL TAMBAH TOKO BERDASARKAN STATUS IZIN] */}
+        
           {izinStatus === 'diterima' ? (
             <button
               onClick={() => setIsModalOpen(true)}
@@ -514,7 +513,7 @@ export default function StorePage() {
         </div>
       </div>
 
-      {/* [TAMPILAN RIWAYAT & STATUS IZIN PEMBUATAN TOKO JIKA BELUM DITERIMA] */}
+     
       {izinStatus && izinStatus !== 'diterima' && (
         <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
@@ -682,7 +681,7 @@ export default function StorePage() {
         </div>
       )}
 
-      {/* [MODAL FORM PENGAJUAN IZIN BUAT TOKO & PEMBAYARAN DANA] */}
+      
       {isIzinModalOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">

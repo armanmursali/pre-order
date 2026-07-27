@@ -1,4 +1,3 @@
-// app/login/page.tsx
 'use client';
 
 import React, { useState, Suspense } from 'react';
@@ -6,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
 
-// [PERBAIKAN]: Komponen internal untuk menangani logika halaman login yang menggunakan useSearchParams
+
 function LoginForm() {
   const router = useRouter();
   
@@ -45,13 +44,13 @@ function LoginForm() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-amber-50 via-orange-50 to-white px-4 relative overflow-hidden">
       
-      {/* Elemen Dekoratif Latar Belakang */}
+     
       <div className="absolute w-96 h-96 bg-orange-200/40 rounded-full blur-3xl -top-20 -left-20 -z-0"></div>
       <div className="absolute w-96 h-96 bg-amber-200/40 rounded-full blur-3xl -bottom-20 -right-20 -z-0"></div>
 
       <div className="w-full max-w-md rounded-3xl bg-white p-8 sm:p-10 shadow-2xl border border-gray-100 z-10 space-y-6">
         
-        {/* Header Branding Aplikasi */}
+       
         <div className="text-center space-y-2">
           <div className="w-14 h-14 bg-amber-800 text-white rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold shadow-md">
             M

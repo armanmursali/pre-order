@@ -1,4 +1,3 @@
-// app/(dashboard)/beranda/page.tsx
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
@@ -44,23 +43,23 @@ export default function BerandaPage() {
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // State untuk input pencarian dan hasil pencarian
+
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResultItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
-  // State untuk rekomendasi produk atau toko serupa di panel samping secara otomatis
+ 
   const [similarItems, setSimilarItems] = useState<SearchResultItem[]>([]);
   const [isLoadingSimilar, setIsLoadingSimilar] = useState(false);
 
-  // [STATE BARU]: State untuk produk dari toko yang diikuti & rekomendasi toko bentuk bulat geser samping
+ 
   const [followedProducts, setFollowedProducts] = useState<any[]>([]);
   const [randomStoresToFollow, setRandomStoresToFollow] = useState<any[]>([]);
   const [isLoadingFeed, setIsLoadingFeed] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Memeriksa sesi pengguna aktif saat halaman dimuat
+  
   useEffect(() => {
     const supabase = createClient();
 
@@ -73,7 +72,7 @@ export default function BerandaPage() {
         const userId = session.user.id;
         setCurrentUserId(userId);
         setLoading(false);
-        // Memuat umpan produk toko yang diikuti & rekomendasi toko acak
+       
         fetchHomeFeedData(userId, supabase);
       }
     }
@@ -81,12 +80,12 @@ export default function BerandaPage() {
     checkUserSession();
   }, [router]);
 
-  // [FUNGSI UMPAN BERANDA]: Mengambil produk dari toko yang difollow dan rekomendasi toko acak
+ 
   const fetchHomeFeedData = async (userId: string, supabase: any) => {
     try {
       setIsLoadingFeed(true);
 
-      // 1. Ambil daftar ID toko yang diikuti oleh pengguna aktif dari tabel follower_toko
+    
       const { data: followingData } = await supabase
         .from('follower_toko')
         .select('id_toko')
@@ -95,7 +94,7 @@ export default function BerandaPage() {
       const followedStoreIds = (followingData || []).map((f: any) => f.id_toko);
 
       if (followedStoreIds.length > 0) {
-        // Ambil produk dari toko-toko yang diikuti
+       
         const { data: prodData } = await supabase
           .from('produk')
           .select('id, toko_id, nama, harga, foto, jenis_produk(nama), toko:toko_id(id, user_id, nama)')
@@ -108,20 +107,20 @@ export default function BerandaPage() {
         setFollowedProducts([]);
       }
 
-      // 2. Ambil toko rekomendasi secara acak untuk di-follow (kecuali toko milik sendiri & yang sudah difollow)
+     
       const { data: allStores } = await supabase
         .from('toko')
         .select('id, user_id, nama, foto, kategori_toko(nama)')
         .neq('user_id', userId);
 
       if (allStores) {
-        // Filter agar tidak menampilkan toko yang sudah diikuti
+       
         const unfollowedStores = allStores.filter(
           (store: any) => !followedStoreIds.includes(store.id)
         );
         // Acak urutan toko (randomize)
         const shuffled = unfollowedStores.sort(() => 0.5 - Math.random());
-        setRandomStoresToFollow(shuffled.slice(0, 10)); // Batasi 10 toko acak
+        setRandomStoresToFollow(shuffled.slice(0, 10));
       }
     } catch (err) {
       console.error('Gagal memuat umpan beranda:', err);
@@ -130,7 +129,7 @@ export default function BerandaPage() {
     }
   };
 
-  // [FUNGSI PENCARIAN UTAMA & OTOMATIS AMBIL ITEM SERUPA]:
+  
   const handleSearchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const query = searchQuery.trim();
@@ -142,14 +141,14 @@ export default function BerandaPage() {
     const supabase = createClient();
 
     try {
-      // 1. Cari kategori toko yang cocok dengan query untuk mendapatkan ID-nya
+      
       const { data: matchedKategori } = await supabase
         .from('kategori_toko')
         .select('id')
         .ilike('nama', `%${query}%`);
       const kategoriIds = (matchedKategori || []).map((k: any) => k.id);
 
-      // 2. Ambil data Toko berdasarkan nama atau kategori_id
+     
       let tokoQuery = supabase
         .from('toko')
         .select('id, user_id, nama, deskripsi, foto, kategori_id, kategori_toko(nama)');
@@ -161,14 +160,14 @@ export default function BerandaPage() {
       }
       const { data: tokoData } = await tokoQuery.limit(10);
 
-      // 3. Cari jenis produk yang cocok dengan query untuk mendapatkan ID-nya
+     
       const { data: matchedJenis } = await supabase
         .from('jenis_produk')
         .select('id')
         .ilike('nama', `%${query}%`);
       const jenisIds = (matchedJenis || []).map((j: any) => j.id);
 
-      // 4. Ambil data Produk berdasarkan nama atau jenis_produk_id
+      
       let produkQuery = supabase
         .from('produk')
         .select('id, toko_id, nama, harga, foto, jenis_produk_id, jenis_produk(nama), toko:toko_id(id, user_id, nama)');
@@ -193,7 +192,7 @@ export default function BerandaPage() {
       const combinedResults = [...formattedTokos, ...formattedProduks];
       setSearchResults(combinedResults);
 
-      // [LOGIKA OTOMATIS PRODUK/TOKO SERUPA]: Langsung ambil item sejenis tanpa tombol
+
       if (combinedResults.length > 0) {
         const firstItem = combinedResults[0];
         setIsLoadingSimilar(true);
@@ -249,7 +248,7 @@ export default function BerandaPage() {
 
   return (
     <div className="space-y-6 bg-white text-gray-900 min-h-screen p-0.5 sm:p-6">
-      {/* Kartu Pencarian Utama */}
+    
       <div className="rounded-xl bg-white p-6 shadow-sm border border-gray-200">
         <h1 className="text-xl sm:text-2xl font-bold text-amber-900 mb-2">
           Pencarian Toko & Produk
@@ -258,7 +257,7 @@ export default function BerandaPage() {
           Cari berdasarkan nama toko, produk, kategori toko, atau jenis produk.
         </p>
 
-        {/* Form Input Pencarian dan Tombol Search */}
+      
         <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <i className="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
@@ -291,7 +290,7 @@ export default function BerandaPage() {
         </form>
       </div>
 
-      {/* Bagian Menampilkan Hasil Pencarian */}
+     
       {hasSearched && (
         <div className="space-y-4">
           <h2 className="text-lg font-bold text-gray-800 px-1">
@@ -310,7 +309,7 @@ export default function BerandaPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Kolom Kiri: Hasil Utama Pencarian (2 Kolom span pada layar besar) */}
+             
               <div className="lg:col-span-2 space-y-4">
                 {searchResults.map((item) => {
                   if (item.tipe === 'toko') {
@@ -351,7 +350,7 @@ export default function BerandaPage() {
                   } else {
                     const storeOwnerId = item.toko?.user_id;
                     const isMyStore = storeOwnerId === currentUserId;
-                    // [PENYESUAIAN RUTE PUBLIK]: Mengarahkan ke rute rata /search-produk/[id] agar bebas dari error 404 Vercel
+                   
                     const targetHref = isMyStore ? `/store/${item.toko_id}` : `/search-produk/${item.id}`;
 
                     return (
@@ -390,7 +389,7 @@ export default function BerandaPage() {
                 })}
               </div>
 
-              {/* [KOLOM KANAN]: Bagian Samping Berjejer Produk/Toko Serupa secara Otomatis */}
+             
               <div className="space-y-4">
                 <div className="bg-gray-50 rounded-xl p-4 border border-gray-200 sticky top-4">
                   <h3 className="font-bold text-amber-900 text-sm sm:text-base mb-3 flex items-center gap-2">
@@ -439,7 +438,7 @@ export default function BerandaPage() {
                         } else {
                           const storeOwnerId = sim.toko?.user_id;
                           const isMyStore = storeOwnerId === currentUserId;
-                          // [PENYESUAIAN RUTE PRODUK SERUPA]: Mengarahkan ke /search-produk/[id]
+                         
                           const simTargetHref = isMyStore ? `/store/${sim.toko_id}` : `/search-produk/${sim.id}`;
 
                           return (
@@ -477,10 +476,10 @@ export default function BerandaPage() {
         </div>
       )}
 
-      {/* [BAGIAN BAWAH BERANDA]: Rekomendasi Toko Bulat (Geser Samping) & Umpan Produk Toko Diikuti */}
+     
       <div className="space-y-6 pt-6 border-t border-gray-100">
         
-        {/* Karusel Toko Rekomendasi Berbentuk Bulat (Geser Samping) */}
+       
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-base sm:text-lg font-bold text-amber-900 flex items-center gap-2">
@@ -533,7 +532,7 @@ export default function BerandaPage() {
           )}
         </div>
 
-        {/* Umpan Produk dari Toko yang Diikuti */}
+      
         <div className="space-y-4 pt-4 border-t border-gray-100">
           <h2 className="text-base sm:text-lg font-bold text-amber-900 flex items-center gap-2">
             <i className="fa-solid fa-newspaper text-orange-600"></i>
