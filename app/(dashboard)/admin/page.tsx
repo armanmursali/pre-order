@@ -237,17 +237,7 @@ export default function AdminPage() {
                         <i className="fa-solid fa-check"></i> Terima
                       </button>
 
-                      <button
-                        disabled={isProcessing || item.status === 'ditolak'}
-                        onClick={() => handleUpdateStatusIzin(item, 'ditolak')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1 ${
-                          item.status === 'ditolak'
-                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                            : 'bg-red-600 hover:bg-red-700 text-white'
-                        }`}
-                      >
-                        <i className="fa-solid fa-xmark"></i> Tolak
-                      </button>
+                     
 
                       <button
                         disabled={isProcessing}
