@@ -1,7 +1,7 @@
 // app/(dashboard)/beranda/page.tsx
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
@@ -54,6 +54,12 @@ export default function BerandaPage() {
   const [similarItems, setSimilarItems] = useState<SearchResultItem[]>([]);
   const [isLoadingSimilar, setIsLoadingSimilar] = useState(false);
 
+  // [STATE BARU]: State untuk produk dari toko yang diikuti & rekomendasi toko bentuk bulat geser samping
+  const [followedProducts, setFollowedProducts] = useState<any[]>([]);
+  const [randomStoresToFollow, setRandomStoresToFollow] = useState<any[]>([]);
+  const [isLoadingFeed, setIsLoadingFeed] = useState(true);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
   // Memeriksa sesi pengguna aktif saat halaman dimuat
   useEffect(() => {
     const supabase = createClient();
@@ -64,13 +70,65 @@ export default function BerandaPage() {
       if (error || !session) {
         router.push('/login');
       } else {
-        setCurrentUserId(session.user.id);
+        const userId = session.user.id;
+        setCurrentUserId(userId);
         setLoading(false);
+        // Memuat umpan produk toko yang diikuti & rekomendasi toko acak
+        fetchHomeFeedData(userId, supabase);
       }
     }
 
     checkUserSession();
   }, [router]);
+
+  // [FUNGSI UMPAN BERANDA]: Mengambil produk dari toko yang difollow dan rekomendasi toko acak
+  const fetchHomeFeedData = async (userId: string, supabase: any) => {
+    try {
+      setIsLoadingFeed(true);
+
+      // 1. Ambil daftar ID toko yang diikuti oleh pengguna aktif dari tabel follower_toko
+      const { data: followingData } = await supabase
+        .from('follower_toko')
+        .select('id_toko')
+        .eq('id_users', userId);
+
+      const followedStoreIds = (followingData || []).map((f: any) => f.id_toko);
+
+      if (followedStoreIds.length > 0) {
+        // Ambil produk dari toko-toko yang diikuti
+        const { data: prodData } = await supabase
+          .from('produk')
+          .select('id, toko_id, nama, harga, foto, jenis_produk(nama), toko:toko_id(id, user_id, nama)')
+          .in('toko_id', followedStoreIds)
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        setFollowedProducts(prodData || []);
+      } else {
+        setFollowedProducts([]);
+      }
+
+      // 2. Ambil toko rekomendasi secara acak untuk di-follow (kecuali toko milik sendiri & yang sudah difollow)
+      const { data: allStores } = await supabase
+        .from('toko')
+        .select('id, user_id, nama, foto, kategori_toko(nama)')
+        .neq('user_id', userId);
+
+      if (allStores) {
+        // Filter agar tidak menampilkan toko yang sudah diikuti
+        const unfollowedStores = allStores.filter(
+          (store: any) => !followedStoreIds.includes(store.id)
+        );
+        // Acak urutan toko (randomize)
+        const shuffled = unfollowedStores.sort(() => 0.5 - Math.random());
+        setRandomStoresToFollow(shuffled.slice(0, 10)); // Batasi 10 toko acak
+      }
+    } catch (err) {
+      console.error('Gagal memuat umpan beranda:', err);
+    } finally {
+      setIsLoadingFeed(false);
+    }
+  };
 
   // [FUNGSI PENCARIAN UTAMA & OTOMATIS AMBIL ITEM SERUPA]:
   const handleSearchSubmit = async (e: React.FormEvent) => {
@@ -418,6 +476,128 @@ export default function BerandaPage() {
           )}
         </div>
       )}
+
+      {/* [BAGIAN BAWAH BERANDA]: Rekomendasi Toko Bulat (Geser Samping) & Umpan Produk Toko Diikuti */}
+      <div className="space-y-6 pt-6 border-t border-gray-100">
+        
+        {/* Karusel Toko Rekomendasi Berbentuk Bulat (Geser Samping) */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base sm:text-lg font-bold text-amber-900 flex items-center gap-2">
+              <i className="fa-solid fa-compass text-orange-600"></i>
+              <span>Temukan Toko Lainnya</span>
+            </h2>
+            <span className="text-xs text-gray-400 font-medium">Geser untuk melihat</span>
+          </div>
+
+          {isLoadingFeed ? (
+            <div className="flex items-center justify-center py-8">
+              <i className="fa-solid fa-circle-notch fa-spin text-orange-600"></i>
+            </div>
+          ) : randomStoresToFollow.length === 0 ? (
+            <p className="text-xs text-gray-400 italic">Belum ada rekomendasi toko lain saat ini.</p>
+          ) : (
+            <div className="relative">
+              <div 
+                ref={scrollContainerRef}
+                className="flex items-center gap-4 overflow-x-auto pb-3 pt-1 scrollbar-thin scrollbar-thumb-gray-200 scroll-smooth no-scrollbar"
+              >
+                {randomStoresToFollow.map((store) => {
+                  const isMyStore = store.user_id === currentUserId;
+                  const storeHref = isMyStore ? `/store/${store.id}` : `/search/${store.id}`;
+
+                  return (
+                    <Link
+                      key={`random-store-${store.id}`}
+                      href={storeHref}
+                      className="flex flex-col items-center flex-shrink-0 group w-20 sm:w-24 text-center"
+                    >
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-orange-200 group-hover:border-orange-600 overflow-hidden shadow-sm bg-gray-50 flex items-center justify-center transition-all">
+                        {store.foto ? (
+                          <img src={store.foto} alt={store.nama} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                        ) : (
+                          <i className="fa-solid fa-store text-xl text-gray-400"></i>
+                        )}
+                      </div>
+                      <span className="text-xs font-semibold text-gray-800 group-hover:text-orange-700 transition-colors truncate w-full mt-2">
+                        {store.nama}
+                      </span>
+                      <span className="text-[10px] text-gray-400 truncate w-full">
+                        {store.kategori_toko?.nama || 'Toko'}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Umpan Produk dari Toko yang Diikuti */}
+        <div className="space-y-4 pt-4 border-t border-gray-100">
+          <h2 className="text-base sm:text-lg font-bold text-amber-900 flex items-center gap-2">
+            <i className="fa-solid fa-newspaper text-orange-600"></i>
+            <span>Produk Dari Toko yang Anda Ikuti</span>
+          </h2>
+
+          {isLoadingFeed ? (
+            <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
+              <i className="fa-solid fa-circle-notch fa-spin text-2xl text-orange-600 mb-2 block"></i>
+              <p className="text-xs text-gray-500">Memuat produk ikutan...</p>
+            </div>
+          ) : followedProducts.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 rounded-xl border border-dashed border-gray-200 text-gray-500">
+              <i className="fa-solid fa-store-slash text-3xl mb-2 text-gray-300 block"></i>
+              <p className="text-xs sm:text-sm">Belum ada produk dari toko yang Anda ikuti.</p>
+              <p className="text-[11px] text-gray-400 mt-1">Yuk, ikuti beberapa toko menarik di atas untuk melihat produk terbaru mereka di sini!</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {followedProducts.map((prod) => {
+                const isMyStore = prod.toko?.user_id === currentUserId;
+                const prodHref = isMyStore ? `/store/${prod.toko_id}` : `/search-produk/${prod.id}`;
+
+                return (
+                  <Link
+                    key={`feed-prod-${prod.id}`}
+                    href={prodHref}
+                    className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-orange-200 transition-all flex flex-col overflow-hidden group block"
+                  >
+                    <div className="h-44 w-full bg-gray-100 flex-shrink-0 relative border-b border-gray-100">
+                      {prod.foto ? (
+                        <img src={prod.foto} alt={prod.nama} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-300">
+                          <i className="fa-solid fa-box text-4xl"></i>
+                        </div>
+                      )}
+                      <div className="absolute bottom-3 left-3 bg-amber-900/90 backdrop-blur-sm text-white px-3 py-1 rounded-lg font-bold shadow-sm text-xs sm:text-sm">
+                        {formatRupiah(prod.harga)}
+                      </div>
+                    </div>
+
+                    <div className="p-4 flex flex-col flex-grow">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider">
+                          {prod.jenis_produk?.nama || 'Produk'}
+                        </span>
+                        <span className="text-[11px] text-gray-500 font-medium truncate max-w-[120px]">
+                          di {prod.toko?.nama || 'Toko'}
+                        </span>
+                      </div>
+                      <h3 className="text-sm sm:text-base font-bold text-gray-900 group-hover:text-orange-700 transition-colors leading-tight truncate">
+                        {prod.nama}
+                      </h3>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+      </div>
+
     </div>
   );
 }

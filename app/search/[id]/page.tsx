@@ -1,4 +1,3 @@
-// app/(dashboard)/search/[id]/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -17,7 +16,7 @@ interface TokoDetail {
   alamat?: string | null;
   rekening?: string | null;
   metode_pembayaran?: string | null;
-  konfigurasi_pertanyaan?: any[]; // [PENYESUAIAN PERTANYAAN KUSTOM]: Menampung konfigurasi pertanyaan kustom dari toko
+  konfigurasi_pertanyaan?: any[]; 
   kategori_toko?: {
     nama: string;
   };
@@ -45,7 +44,7 @@ export default function PublicStoreDetailPage() {
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // [STATE FOLLOWER TOKO]: Menyimpan status follow, jumlah follower, dan ID user yang sedang login
+ 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isFollowing, setIsFollowing] = useState<boolean>(false);
   const [followerCount, setFollowerCount] = useState<number>(0);
@@ -71,7 +70,7 @@ export default function PublicStoreDetailPage() {
     }).format(angka);
   };
 
-  // [FUNGSI CEK USER & STATUS FOLLOW]: Memeriksa user aktif dan status apakah sudah mengikuti toko ini serta jumlah total follower
+ 
   const checkUserAndFollowStatus = async (tokoId: string) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -199,7 +198,7 @@ export default function PublicStoreDetailPage() {
   }
 
   return (
-    <div className="space-y-6 relative p-0.5 sm:p-6 bg-white text-gray-900 min-h-screen">
+    <div className="space-y-6 relative p-2 sm:p-6 bg-white text-gray-900 min-h-screen">
       {/* Tombol Kembali ke Beranda */}
       <div className="flex items-center gap-3">
         <button
