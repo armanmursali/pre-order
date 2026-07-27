@@ -121,7 +121,7 @@ export default function DashboardLayout({
           <div className="flex items-center gap-3">
             <img src="/logo.png" alt="Logo AtributShop" className="w-8 h-8 object-contain shrink-0" />
             <span className={`text-xl font-bold text-amber-900 transition-opacity duration-300 ${isDesktopCollapsed ? 'hidden md:hidden' : 'block'}`}>
-              AtributShop
+              Pre - Order
             </span>
           </div>
           <button

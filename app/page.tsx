@@ -89,7 +89,7 @@ export default function Home() {
           <div className="relative w-full max-w-md aspect-square rounded-3xl overflow-hidden shadow-2xl border-4 border-white transform hover:scale-[1.02] transition-transform duration-500 bg-amber-100 flex items-center justify-center">
           
             <img
-              src="https://img.freepik.com/free-vector/online-grocery-shopping-concept-illustration_114360-14861.jpg?w=800"
+              src="/apk.png"
               alt="Ilustrasi Kartun Belanja Harian PT Mances"
               className="w-full h-full object-cover"
             />
