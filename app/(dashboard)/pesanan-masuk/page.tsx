@@ -43,6 +43,15 @@ export default function PesananMasukPage() {
   const [daftarPesanan, setDaftarPesanan] = useState<PesananMasuk[]>([]);
   const [previewBukti, setPreviewBukti] = useState<string | null>(null);
 
+  // [PERBAIKAN]: Menambahkan inisialisasi state untuk 'toast' yang sebelumnya terlewat
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // [PERBAIKAN]: Menambahkan fungsi 'showToast' untuk menangani notifikasi pop-up
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
   // [FUNGSI UTAMA]: Mengambil data toko milik pengguna yang login, dan seluruh pesanan yang masuk ke toko-toko tersebut
   const fetchPesananMasuk = async () => {
     try {
@@ -79,6 +88,8 @@ export default function PesananMasukPage() {
       }
     } catch (error: any) {
       console.error('Gagal mengambil data pesanan masuk:', error.message);
+      // Memanggil fungsi showToast jika terjadi error saat mengambil data
+      showToast('Gagal mengambil data pesanan: ' + error.message, 'error');
     } finally {
       setLoading(false);
     }
