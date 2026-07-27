@@ -161,7 +161,7 @@ export default function PublicProductDetailPage() {
     setShowConfirmModal(true);
   };
 
-  // [FUNGSI PROSES PEMESANAN / TRANSAKSI KETAT]: Mengambil nomor pesanan tertinggi spesifik per toko secara akurat sebelum insert
+  // [FUNGSI PROSES PEMESANAN / TRANSAKSI DENGAN PENGAMANAN COUNT PRESISI]: Menghitung total jumlah pesanan yang ada di toko secara akurat untuk menghindari duplikasi key
   const executeCheckout = async () => {
     if (!produk || isSubmitting) return;
 
@@ -170,25 +170,6 @@ export default function PublicProductDetailPage() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) throw new Error('Anda harus login terlebih dahulu.');
-
-      // [LOGIKA PRESISI NOMOR PESANAN BERDASARKAN TOKO]: Mengambil seluruh nomor pesanan pada toko ini untuk menentukan angka berikutnya secara mutlak
-      const { data: listPesananToko, error: fetchOrderError } = await supabase
-        .from('pesanan')
-        .select('nomor_pesanan')
-        .eq('toko_id', produk.toko_id);
-
-      if (fetchOrderError) throw fetchOrderError;
-
-      let nextNomorPesanan = 1;
-      if (listPesananToko && listPesananToko.length > 0) {
-        const existingNumbers = listPesananToko
-          .map((item: any) => Number(item.nomor_pesanan))
-          .filter((num: number) => !isNaN(num) && num > 0);
-        
-        if (existingNumbers.length > 0) {
-          nextNomorPesanan = Math.max(...existingNumbers) + 1;
-        }
-      }
 
       let buktiUrl = null;
 
@@ -216,26 +197,56 @@ export default function PublicProductDetailPage() {
       }
 
       const totalHarga = produk.harga * jumlah;
+      let insertSuccess = false;
+      let attempts = 0;
+      const maxAttempts = 5;
 
-      // [INSERT DATA DENGAN NOMOR PESANAN KETAT]: Menyertakan nomor_pesanan yang dihitung secara akurat dari kode
-      const { error: insertError } = await supabase
-        .from('pesanan')
-        .insert({
-          produk_id: produk.id,
-          toko_id: produk.toko_id,
-          pembeli_id: session.user.id,
-          jumlah: jumlah,
-          total_harga: totalHarga,
-          metode_pilihan: metodePilihan,
-          bukti_transfer: buktiUrl,
-          alamat_pembeli: alamatPembeli,
-          telepon_pembeli: teleponPembeli,
-          jawaban_pertanyaan: jawabanPertanyaan,
-          nomor_pesanan: nextNomorPesanan,
-          status: 'Belum Diterima',
-        });
+      // [LOOP PENGAMANAN TRANSAKSI KETAT]: Menghitung jumlah pesanan eksak di toko + percobaan ulang otomatis jika terjadi tabrakan milidetik
+      while (!insertSuccess && attempts < maxAttempts) {
+        attempts++;
 
-      if (insertError) throw insertError;
+        // Menggunakan fungsi count exact dari Supabase untuk mendapatkan jumlah total pesanan pada toko tersebut
+        const { count, error: countError } = await supabase
+          .from('pesanan')
+          .select('*', { count: 'exact', head: true })
+          .eq('toko_id', produk.toko_id);
+
+        if (countError) throw countError;
+
+        let nextNomorPesanan = (count || 0) + attempts; // Menambahkan offset percobaan jika terjadi tabrakan
+
+        const { error: insertError } = await supabase
+          .from('pesanan')
+          .insert({
+            produk_id: produk.id,
+            toko_id: produk.toko_id,
+            pembeli_id: session.user.id,
+            jumlah: jumlah,
+            total_harga: totalHarga,
+            metode_pilihan: metodePilihan,
+            bukti_transfer: buktiUrl,
+            alamat_pembeli: alamatPembeli,
+            telepon_pembeli: teleponPembeli,
+            jawaban_pertanyaan: jawabanPertanyaan,
+            nomor_pesanan: nextNomorPesanan,
+            status: 'Belum Diterima',
+          });
+
+        if (!insertError) {
+          insertSuccess = true;
+        } else {
+          if (insertError.code === '23505' && attempts < maxAttempts) {
+            // Lanjutkan loop dengan nomor berikutnya jika terjadi duplikasi kunci unik
+            continue;
+          } else {
+            throw insertError;
+          }
+        }
+      }
+
+      if (!insertSuccess) {
+        throw new Error('Gagal menghasilkan nomor pesanan unik yang aman.');
+      }
 
       // [PENGALIHAN CEPAT KE /pesanan DENGAN FLASH TOAST]: Menyimpan pesan sukses dan langsung redirect tanpa jeda
       localStorage.setItem('flash_toast', 'Pesanan berhasil dibuat! Status: Belum Diterima pemilik.');
