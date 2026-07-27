@@ -5,11 +5,11 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
-import Paginator from '@/components/Paginator';
+import Paginator from '../../components/Paginator';
 
 interface PesananItem {
   id: string;
-  toko_id: string; // [PERBAIKAN]: Memastikan toko_id tersedia untuk kebutuhan penyesuaian nomor antrean
+  toko_id: string; 
   nomor_pesanan: number;
   jumlah: number;
   total_harga: number;
@@ -134,7 +134,6 @@ export default function PesananPage() {
     setDeleteModalVisible(true);
   };
 
-  // [PERBAIKAN]: Logika Hapus Pesanan Pembeli dengan Penanganan Error Supabase & Penurunan Nomor Antrean Dinamis
   const executeDeletePesanan = async () => {
     if (!selectedDeletePesanan || deleteConfirmationText !== 'HAPUS') return;
     setIsProcessingAction(true);
@@ -145,7 +144,6 @@ export default function PesananPage() {
 
       if (!currentTokoId) throw new Error("ID Toko tidak terdeteksi pada pesanan ini.");
 
-      // 1. Eksekusi hapus pesanan utama di database
       const { error: deleteError } = await supabase
         .from('pesanan')
         .delete()
@@ -153,7 +151,6 @@ export default function PesananPage() {
 
       if (deleteError) throw deleteError;
 
-      // 2. Ambil semua pesanan lain di toko yang sama yang nomor_pesanannya lebih besar
       const { data: toUpdate, error: fetchError } = await supabase
         .from('pesanan')
         .select('id, nomor_pesanan')
@@ -162,7 +159,6 @@ export default function PesananPage() {
 
       if (fetchError) throw fetchError;
 
-      // 3. Lakukan update perulangan untuk menurunkan nomor antrean
       if (toUpdate && toUpdate.length > 0) {
         for (const item of toUpdate) {
           const { error: updateError } = await supabase
@@ -324,13 +320,14 @@ export default function PesananPage() {
             ))}
           </div>
 
+          {/* [PERBAIKAN]: Menambahkan tipe data eksplisit (newVal: number) pada parameter callback untuk meredam galat TypeScript */}
           <Paginator 
             currentPage={currentPage}
             totalPages={totalPages}
             totalItems={totalItems}
             itemsPerPage={itemsPerPage}
             onPageChange={setCurrentPage}
-            onItemsPerPageChange={(newVal) => {
+            onItemsPerPageChange={(newVal: number) => {
               setItemsPerPage(newVal);
               setCurrentPage(1);
             }}
