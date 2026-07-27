@@ -205,7 +205,7 @@ export default function StorePage() {
     }
   };
 
-  // [FUNGSI KIRIM FORMULIR IZIN PEMBUATAN TOKO]
+  // [FUNGSI KIRIM FORMULIR IZIN PEMBUATAN TOKO (BISA DIAJUKAN ULANG/BARU)]
   const handleIzinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!izinForm.nama_lengkap || !izinForm.telepon || !izinForm.fileBukti) {
@@ -223,7 +223,7 @@ export default function StorePage() {
       const filePath = `public/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('foto-toko') // Menggunakan bucket foto-toko untuk bukti transfer izin
+        .from('foto-toko')
         .upload(filePath, izinForm.fileBukti);
 
       if (uploadError) throw uploadError;
@@ -234,21 +234,24 @@ export default function StorePage() {
 
       const buktiUrl = publicUrlData.publicUrl;
 
-      const { error: insertError } = await supabase
+      // Menggunakan upsert agar jika record sebelumnya ada (ditolak/diterima), baris diperbarui menjadi pending untuk pengajuan baru
+      const { error: upsertError } = await supabase
         .from('izin_buat_toko')
-        .insert({
+        .upsert({
           user_id: session.user.id,
           nama_lengkap: izinForm.nama_lengkap,
           telepon: izinForm.telepon,
           catatan: izinForm.catatan,
           bukti_transfer: buktiUrl,
           status: 'pending',
-        });
+          created_at: new Date().toISOString()
+        }, { onConflict: 'user_id' });
 
-      if (insertError) throw insertError;
+      if (upsertError) throw upsertError;
 
       showToast('Permintaan izin buat toko berhasil dikirim. Menunggu verifikasi admin.', 'success');
       setIsIzinModalOpen(false);
+      setIzinForm({ nama_lengkap: '', telepon: '', catatan: '', fileBukti: null, previewBukti: '' });
       checkIzinStatus(session.user.id);
     } catch (err: any) {
       showToast('Gagal mengirim izin: ' + err.message, 'error');
@@ -493,15 +496,25 @@ export default function StorePage() {
             <span>Gabung Toko</span>
           </button>
           
-          {/* [VALIDASI TOMBOL TAMBAH TOKO BERDASARKAN STATUS IZIN] */}
+          {/* [VALIDASI TOMBOL TAMBAH TOKO & PENGAJUAN ULANG BERDASARKAN STATUS IZIN] */}
           {izinStatus === 'diterima' ? (
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-orange-600 hover:bg-orange-700 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors shadow-sm"
-            >
-              <i className="fa-solid fa-plus"></i>
-              <span>Tambah Toko</span>
-            </button>
+            <div className="flex items-center gap-2 flex-1 sm:flex-none">
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 bg-orange-600 hover:bg-orange-700 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors shadow-sm"
+              >
+                <i className="fa-solid fa-plus"></i>
+                <span>Tambah Toko</span>
+              </button>
+              <button
+                onClick={() => setIsIzinModalOpen(true)}
+                className="flex items-center justify-center gap-1.5 bg-amber-700 hover:bg-amber-800 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors shadow-sm"
+                title="Daftar ulang pengajuan untuk membuat toko baru (perlu izin & bayar ulang)"
+              >
+                <i className="fa-solid fa-receipt"></i>
+                <span>Ajukan Izin Toko Baru</span>
+              </button>
+            </div>
           ) : (
             <button
               onClick={() => setIsIzinModalOpen(true)}
@@ -514,17 +527,21 @@ export default function StorePage() {
         </div>
       </div>
 
-      {/* [TAMPILAN RIWAYAT & STATUS IZIN PEMBUATAN TOKO JIKA BELUM DITERIMA] */}
-      {izinStatus && izinStatus !== 'diterima' && (
-        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      {/* [TAMPILAN RIWAYAT & STATUS IZIN PEMBUATAN TOKO JIKA BELUM DITERIMA ATAU SUDAH DITERIMA] */}
+      {izinStatus && (
+        <div className={`mb-6 p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border ${
+          izinStatus === 'diterima' ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200'
+        }`}>
           <div>
-            <h3 className="text-sm font-bold text-yellow-800 flex items-center gap-2">
-              <i className="fa-solid fa-triangle-exclamation"></i>
+            <h3 className={`text-sm font-bold flex items-center gap-2 ${izinStatus === 'diterima' ? 'text-green-800' : 'text-yellow-800'}`}>
+              <i className={izinStatus === 'diterima' ? 'fa-solid fa-circle-check text-green-600' : 'fa-solid fa-triangle-exclamation'}></i>
               Status Izin Buat Toko: <span className="uppercase text-orange-700">{izinStatus}</span>
             </h3>
-            <p className="text-xs text-yellow-700 mt-1">
+            <p className={`text-xs mt-1 ${izinStatus === 'diterima' ? 'text-green-700' : 'text-yellow-700'}`}>
               {izinStatus === 'pending' 
                 ? 'Pengajuan Anda sedang ditinjau oleh Admin. Anda belum dapat membuat toko sebelum disetujui.' 
+                : izinStatus === 'diterima'
+                ? 'Pengajuan Anda telah disetujui. Anda dapat membuat toko atau mengajukan izin baru jika ingin membuat toko tambahan.'
                 : 'Pengajuan izin buat toko Anda ditolak. Silakan ajukan kembali.'}
             </p>
             {izinData && (
@@ -682,12 +699,12 @@ export default function StorePage() {
         </div>
       )}
 
-      {/* [MODAL FORM PENGAJUAN IZIN BUAT TOKO & PEMBAYARAN DANA] */}
+      {/* [MODAL FORM PENGAJUAN ULANG/BARU IZIN BUAT TOKO & PEMBAYARAN DANA] */}
       {isIzinModalOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
             <div className="flex justify-between items-center px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200">
-              <h2 className="text-base sm:text-lg font-bold text-amber-900">Formulir Pengajuan Izin Buat Toko</h2>
+              <h2 className="text-base sm:text-lg font-bold text-amber-900">Formulir Pengajuan Izin Buat Toko Baru</h2>
               <button onClick={() => setIsIzinModalOpen(false)} className="text-gray-400 hover:text-red-500 transition-colors">
                 <i className="fa-solid fa-xmark text-lg sm:text-xl"></i>
               </button>
@@ -696,7 +713,7 @@ export default function StorePage() {
             <div className="overflow-y-auto p-4 sm:p-6 space-y-4">
               <div className="p-3.5 bg-orange-50 border border-orange-200 rounded-xl text-xs text-orange-900 space-y-1">
                 <p className="font-bold">Instruksi Pembayaran:</p>
-                <p>Silakan melakukan pembayaran biaya administrasi/izin toko ke DANA e-wallet berikut:</p>
+                <p>Silakan melakukan pembayaran biaya administrasi/izin toko baru ke DANA e-wallet berikut:</p>
                 <p className="font-extrabold text-amber-900 text-sm">Arman Mursali - 082253920610</p>
                 <p className="text-[11px] text-gray-600">Setelah transfer, isi formulir di bawah ini dan unggah bukti pembayarannya.</p>
               </div>
@@ -776,7 +793,7 @@ export default function StorePage() {
                     className="px-4 py-2 text-xs sm:text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-lg flex items-center gap-2 shadow-sm"
                     disabled={isSubmitting}
                   >
-                    {isSubmitting ? <><i className="fa-solid fa-circle-notch fa-spin"></i> Mengirim...</> : 'Kirim Pengajuan Izin'}
+                    {isSubmitting ? <><i className="fa-solid fa-circle-notch fa-spin"></i> Mengirim...</> : 'Kirim Pengajuan Izin Baru'}
                   </button>
                 </div>
               </form>
