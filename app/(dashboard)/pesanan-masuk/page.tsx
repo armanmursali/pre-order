@@ -33,15 +33,10 @@ interface PesananMasuk {
     nama: string;
     konfigurasi_pertanyaan?: any[];
   };
-  // [PERBAIKAN]: Menambahkan alias 'pembeli' untuk menampung data join eksplisit dari relasi pembeli_id ke users
-  pembeli?: {
-    nama?: string;
-    email?: string;
-  } | null;
   users?: {
     nama?: string;
     email?: string;
-  } | null;
+  };
 }
 
 export default function PesananMasukPage() {
@@ -77,6 +72,8 @@ export default function PesananMasukPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  // [FUNGSI UTAMA]: Mengambil data pesanan dari server
+  // Logika pembacaan toko (pemilik OR anggota) tetap utuh sesuai arsitektur cerdas Anda
   const fetchPesananMasuk = async () => {
     try {
       setLoading(true);
@@ -99,11 +96,9 @@ export default function PesananMasukPage() {
       if (tokoData && tokoData.length > 0) {
         const tokoIds = tokoData.map(t => t.id);
 
-        // [PERBAIKAN]: Menuliskan join eksplisit pembeli:users!pembeli_id(nama, email) 
-        // Ini memaksa Supabase mengenali relasi yang tepat tanpa ambiguitas
         const { data: pesananData, error: pesananError } = await supabase
           .from('pesanan')
-          .select('*, produk(nama, foto), toko(nama, konfigurasi_pertanyaan), pembeli:users!pembeli_id(nama, email)')
+          .select('*, produk(nama, foto), toko(nama, konfigurasi_pertanyaan), users(nama, email)')
           .in('toko_id', tokoIds)
           .order('nomor_pesanan', { ascending: true });
 
@@ -162,10 +157,8 @@ export default function PesananMasukPage() {
     }).format(date);
   };
 
-  // [PERBAIKAN]: Membaca relasi eksplisit pembeli, dan memberi pesan jelas jika RLS memblokir data
   const getEmailPembeli = (pesanan: PesananMasuk) => {
-    const email = pesanan.pembeli?.email || pesanan.users?.email;
-    return email ? email : 'Tidak tersedia (Terblokir RLS)';
+    return pesanan.users?.email || 'Email tidak tersedia';
   };
 
   const pesananDitampilkan = daftarPesanan.filter(p => {
@@ -339,6 +332,7 @@ export default function PesananMasukPage() {
     }
   };
 
+  // [CATATAN]: Fungsi penghapusan/penolakan ini akan 100% bekerja setelah RLS Policy Delete dijalankan di Supabase.
   const handleTolakPesanan = async () => {
     if (!selectedActionPesanan) return;
     setIsProcessingAction(true);
