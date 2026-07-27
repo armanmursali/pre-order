@@ -20,6 +20,10 @@ interface TokoDetail {
   kategori_toko?: {
     nama: string;
   };
+
+  users?: {
+    nama: string;
+  };
 }
 
 interface Produk {
@@ -44,7 +48,6 @@ export default function PublicStoreDetailPage() {
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
- 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isFollowing, setIsFollowing] = useState<boolean>(false);
   const [followerCount, setFollowerCount] = useState<number>(0);
@@ -70,7 +73,6 @@ export default function PublicStoreDetailPage() {
     }).format(angka);
   };
 
- 
   const checkUserAndFollowStatus = async (tokoId: string) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -79,7 +81,6 @@ export default function PublicStoreDetailPage() {
       const userId = session.user.id;
       setCurrentUserId(userId);
 
-    
       const { count, error: countError } = await supabase
         .from('follower_toko')
         .select('*', { count: 'exact', head: true })
@@ -89,7 +90,6 @@ export default function PublicStoreDetailPage() {
         setFollowerCount(count);
       }
 
-    
       const { data: followData, error: followError } = await supabase
         .from('follower_toko')
         .select('id')
@@ -105,7 +105,6 @@ export default function PublicStoreDetailPage() {
     }
   };
 
- 
   const handleToggleFollow = async () => {
     if (!toko || !currentUserId) return;
     if (toko.user_id === currentUserId) {
@@ -116,7 +115,6 @@ export default function PublicStoreDetailPage() {
     setIsProcessingFollow(true);
     try {
       if (isFollowing) {
-       
         const { error } = await supabase
           .from('follower_toko')
           .delete()
@@ -129,7 +127,6 @@ export default function PublicStoreDetailPage() {
         setFollowerCount((prev) => Math.max(0, prev - 1));
         showToast('Berhenti mengikuti toko.', 'success');
       } else {
-       
         const { error } = await supabase
           .from('follower_toko')
           .insert([{ id_toko: toko.id, id_users: currentUserId }]);
@@ -147,15 +144,14 @@ export default function PublicStoreDetailPage() {
     }
   };
 
- 
   const fetchPublicStoreData = async (tokoId: string) => {
     try {
       setLoading(true);
 
-     
+      // [UPDATE QUERY TOKO]: Mengambil data toko beserta relasi nama pemilik dari tabel users (users:user_id(nama))
       const { data: dataToko, error: errorToko } = await supabase
         .from('toko')
-        .select('*, kategori_toko(nama)')
+        .select('*, kategori_toko(nama), users:user_id(nama)')
         .eq('id', tokoId)
         .single();
 
@@ -167,7 +163,6 @@ export default function PublicStoreDetailPage() {
 
       setToko(dataToko);
 
-      
       const { data: dataProduk } = await supabase
         .from('produk')
         .select('*, jenis_produk(nama)')
@@ -199,7 +194,7 @@ export default function PublicStoreDetailPage() {
 
   return (
     <div className="space-y-6 relative p-2 sm:p-6 bg-white text-gray-900 min-h-screen">
-     
+      
       <div className="flex items-center gap-3">
         <button
           onClick={() => router.push('/beranda')}
@@ -211,7 +206,6 @@ export default function PublicStoreDetailPage() {
         <h1 className="text-xl font-bold text-amber-900">Kunjungan Toko</h1>
       </div>
 
-    
       <div className="bg-white text-gray-900 rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-200 flex items-center justify-between bg-orange-50/30">
           <h2 className="text-base sm:text-lg font-bold text-amber-900">Informasi Toko</h2>
@@ -236,9 +230,15 @@ export default function PublicStoreDetailPage() {
 
           <div className="w-full md:w-2/3 flex flex-col bg-white">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900">{toko.nama}</h2>
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900">{toko.nama}</h2>
+                {/* [TAMPILAN OWNER]: Menampilkan nama pemilik toko di bawah nama toko */}
+                <p className="text-xs sm:text-sm text-gray-500 mt-1 flex items-center gap-1.5">
+                  <i className="fa-solid fa-user-tie text-orange-600"></i>
+                  <span>Owner: <strong className="text-gray-800">{toko.users?.nama || 'Pemilik Toko'}</strong></span>
+                </p>
+              </div>
 
-              
               {currentUserId && toko.user_id !== currentUserId && (
                 <div className="flex items-center gap-3">
                   <span className="text-xs text-gray-500 font-medium">
@@ -285,7 +285,6 @@ export default function PublicStoreDetailPage() {
                 </p>
               </div>
 
-             
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 bg-white">
                 <div className="p-3.5 sm:p-4 bg-white rounded-xl border border-gray-200">
                   <p className="text-[11px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Nomor Telepon / WhatsApp</p>
@@ -324,7 +323,6 @@ export default function PublicStoreDetailPage() {
         </div>
       </div>
 
-     
       <div className="bg-white text-gray-900 rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
         <div className="mb-4 sm:mb-6 border-b border-gray-100 pb-3.5 sm:pb-4 bg-white">
           <h2 className="text-lg sm:text-xl font-bold text-amber-900">Produk yang Dijual</h2>
@@ -337,34 +335,39 @@ export default function PublicStoreDetailPage() {
             <p>Toko ini belum memiliki produk.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 bg-white">
+          
+          <div className="flex flex-col sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 bg-white">
             {produks.map((produk) => (
-             
               <Link
                 key={produk.id}
                 href={`/search-produk/${produk.id}`}
-                className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-orange-200 transition-all flex flex-col overflow-hidden group block"
+                className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-orange-200 transition-all flex flex-row sm:flex-col overflow-hidden group block items-center sm:items-stretch"
               >
-                <div className="h-48 w-full bg-white flex-shrink-0 relative cursor-pointer border-b border-gray-100" onClick={(e) => { e.preventDefault(); produk.foto && setPreviewImageUrl(produk.foto); }}>
+                {/* [UKURAN GAMBAR MOBILE VS DESKTOP]: Gambar kecil memanjang di mobile, card kotak besar di desktop */}
+                <div className="h-24 w-24 sm:h-48 sm:w-full bg-white flex-shrink-0 relative cursor-pointer border-r sm:border-r-0 sm:border-b border-gray-100" onClick={(e) => { e.preventDefault(); produk.foto && setPreviewImageUrl(produk.foto); }}>
                   {produk.foto ? (
                     <img src={produk.foto} alt={produk.nama} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-300 bg-white">
-                      <i className="fa-solid fa-box text-5xl text-gray-200"></i>
+                      <i className="fa-solid fa-box text-3xl sm:text-5xl text-gray-200"></i>
                     </div>
                   )}
-                  <div className="absolute bottom-3 left-3 bg-amber-900/90 backdrop-blur-sm text-white px-3 py-1 rounded-lg font-bold shadow-sm text-sm">
+                  <div className="hidden sm:block absolute bottom-3 left-3 bg-amber-900/90 backdrop-blur-sm text-white px-3 py-1 rounded-lg font-bold shadow-sm text-sm">
                     {formatRupiah(produk.harga)}
                   </div>
                 </div>
                 
-                <div className="p-5 flex flex-col flex-grow bg-white">
-                  <span className="w-fit bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider mb-2">
+                <div className="p-3 sm:p-5 flex flex-col justify-center sm:justify-start flex-grow bg-white">
+                  <span className="w-fit bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider mb-1 sm:mb-2">
                     {produk.jenis_produk?.nama || 'Tanpa Jenis'}
                   </span>
-                  <h3 className="text-lg font-bold text-gray-900 group-hover:text-orange-700 transition-colors leading-tight truncate">
+                  <h3 className="text-sm sm:text-lg font-bold text-gray-900 group-hover:text-orange-700 transition-colors leading-tight truncate">
                     {produk.nama}
                   </h3>
+                  {/* [HARGA MOBILE]: Menampilkan harga di bawah nama khusus untuk tampilan list mobile */}
+                  <span className="sm:hidden text-xs font-extrabold text-amber-900 mt-1">
+                    {formatRupiah(produk.harga)}
+                  </span>
                 </div>
               </Link>
             ))}
@@ -372,7 +375,6 @@ export default function PublicStoreDetailPage() {
         )}
       </div>
 
-   
       {previewImageUrl && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md" onClick={() => setPreviewImageUrl(null)}>
           <div className="relative max-w-4xl w-full max-h-[90vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
