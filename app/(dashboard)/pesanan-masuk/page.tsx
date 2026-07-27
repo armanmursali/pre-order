@@ -33,10 +33,9 @@ interface PesananMasuk {
     nama: string;
     konfigurasi_pertanyaan?: any[];
   };
+  // [PERBAIKAN]: Menyesuaikan antarmuka agar hanya menerima 'nama' sesuai database Anda
   users?: {
     nama?: string;
-    name?: string;
-    full_name?: string;
   };
 }
 
@@ -48,7 +47,6 @@ export default function PesananMasukPage() {
   const [daftarToko, setDaftarToko] = useState<Toko[]>([]);
   const [selectedTokoId, setSelectedTokoId] = useState<string>('semua');
   
-  // [PERBAIKAN PENCARIAN]: State baru untuk menyimpan kata kunci pencarian
   const [searchQuery, setSearchQuery] = useState<string>('');
   
   const [daftarPesanan, setDaftarPesanan] = useState<PesananMasuk[]>([]);
@@ -95,9 +93,10 @@ export default function PesananMasukPage() {
         const tokoIds = tokoData.map(t => t.id);
 
         // 2. Ambil pesanan yang masuk ke toko tersebut
+        // [PERBAIKAN]: Menghapus pengambilan 'name' dan 'full_name', murni hanya memanggil 'users(nama)'
         const { data: pesananData, error: pesananError } = await supabase
           .from('pesanan')
-          .select('*, produk(nama, foto), toko(nama, konfigurasi_pertanyaan), users(nama, name, full_name)')
+          .select('*, produk(nama, foto), toko(nama, konfigurasi_pertanyaan), users(nama)')
           .in('toko_id', tokoIds)
           .order('nomor_pesanan', { ascending: true });
 
@@ -156,23 +155,18 @@ export default function PesananMasukPage() {
     }).format(date);
   };
 
-  // [FUNGSI BANTUAN]: Membaca nama pembeli dengan fallback agar tidak 'Anonim'
+  // [FUNGSI BANTUAN]: Membaca nama pembeli murni dari kolom 'nama' saja
   const getNamaPembeli = (pesanan: PesananMasuk) => {
-    if (pesanan.users) {
-      if (pesanan.users.nama) return pesanan.users.nama;
-      if (pesanan.users.name) return pesanan.users.name;
-      if (pesanan.users.full_name) return pesanan.users.full_name;
+    // [PERBAIKAN]: Hanya memvalidasi dan mengambil dari pesanan.users.nama
+    if (pesanan.users && pesanan.users.nama) {
+      return pesanan.users.nama;
     }
-    // Jika data dari tabel users tidak dapat dibaca, gunakan ID pembeli
     return `User: ${pesanan.pembeli_id?.substring(0, 8)}...`;
   };
 
-  // [PERBAIKAN LOGIC PENCARIAN & FILTER]: Menggabungkan filter toko dan filter pencarian nama / no pesanan
   const pesananDitampilkan = daftarPesanan.filter(p => {
-    // Cek kecocokan Toko
     const isTokoMatch = selectedTokoId === 'semua' || p.toko_id === selectedTokoId;
     
-    // Cek kecocokan Pencarian
     const query = searchQuery.toLowerCase();
     const namaPembeli = getNamaPembeli(p).toLowerCase();
     const noPesanan = p.nomor_pesanan.toString();
@@ -206,7 +200,6 @@ export default function PesananMasukPage() {
     );
   };
 
-  // [FUNGSI DRAG AND DROP]
   const handleDragStart = (e: React.DragEvent, colId: string) => {
     setDraggedCol(colId);
     e.dataTransfer.effectAllowed = 'move';
@@ -231,7 +224,6 @@ export default function PesananMasukPage() {
     setDraggedCol(null);
   };
 
-  // [FUNGSI RENDER CELL]
   const renderTableCell = (pesanan: PesananMasuk, colId: string) => {
     switch (colId) {
       case 'nomor_pesanan':
@@ -312,7 +304,6 @@ export default function PesananMasukPage() {
 
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto flex-wrap">
           
-          {/* [PERBAIKAN PENCARIAN]: Form Input Pencarian */}
           <div className="relative w-full sm:w-56">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <i className="fa-solid fa-magnifying-glass text-gray-400"></i>
@@ -326,7 +317,6 @@ export default function PesananMasukPage() {
             />
           </div>
 
-          {/* Toggle View Mode */}
           <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200 w-full sm:w-auto justify-center">
             <button 
               onClick={() => setViewMode('card')}
@@ -342,7 +332,6 @@ export default function PesananMasukPage() {
             </button>
           </div>
 
-          {/* Dropdown Toko */}
           <div className="w-full sm:w-auto flex items-center gap-2">
             <label htmlFor="filterToko" className="text-xs font-semibold text-gray-600 whitespace-nowrap hidden xl:block">
               Filter Toko:
