@@ -161,7 +161,7 @@ export default function PublicProductDetailPage() {
     setShowConfirmModal(true);
   };
 
-  // [FUNGSI PROSES PEMESANAN / TRANSAKSI DENGAN PENGAMANAN COUNT PRESISI]: Menghitung total jumlah pesanan yang ada di toko secara akurat untuk menghindari duplikasi key
+  // [FUNGSI PROSES PEMESANAN / TRANSAKSI]: Menyimpan data pesanan ke database (nomor_pesanan di-generate otomatis oleh database trigger)
   const executeCheckout = async () => {
     if (!produk || isSubmitting) return;
 
@@ -197,56 +197,25 @@ export default function PublicProductDetailPage() {
       }
 
       const totalHarga = produk.harga * jumlah;
-      let insertSuccess = false;
-      let attempts = 0;
-      const maxAttempts = 5;
 
-      // [LOOP PENGAMANAN TRANSAKSI KETAT]: Menghitung jumlah pesanan eksak di toko + percobaan ulang otomatis jika terjadi tabrakan milidetik
-      while (!insertSuccess && attempts < maxAttempts) {
-        attempts++;
+      // [INSERT DATA KE DATABASE]: Mengirim data transaksi tanpa perlu menyertakan nomor_pesanan secara manual
+      const { error: insertError } = await supabase
+        .from('pesanan')
+        .insert({
+          produk_id: produk.id,
+          toko_id: produk.toko_id,
+          pembeli_id: session.user.id,
+          jumlah: jumlah,
+          total_harga: totalHarga,
+          metode_pilihan: metodePilihan,
+          bukti_transfer: buktiUrl,
+          alamat_pembeli: alamatPembeli,
+          telepon_pembeli: teleponPembeli,
+          jawaban_pertanyaan: jawabanPertanyaan,
+          status: 'Belum Diterima',
+        });
 
-        // Menggunakan fungsi count exact dari Supabase untuk mendapatkan jumlah total pesanan pada toko tersebut
-        const { count, error: countError } = await supabase
-          .from('pesanan')
-          .select('*', { count: 'exact', head: true })
-          .eq('toko_id', produk.toko_id);
-
-        if (countError) throw countError;
-
-        let nextNomorPesanan = (count || 0) + attempts; // Menambahkan offset percobaan jika terjadi tabrakan
-
-        const { error: insertError } = await supabase
-          .from('pesanan')
-          .insert({
-            produk_id: produk.id,
-            toko_id: produk.toko_id,
-            pembeli_id: session.user.id,
-            jumlah: jumlah,
-            total_harga: totalHarga,
-            metode_pilihan: metodePilihan,
-            bukti_transfer: buktiUrl,
-            alamat_pembeli: alamatPembeli,
-            telepon_pembeli: teleponPembeli,
-            jawaban_pertanyaan: jawabanPertanyaan,
-            nomor_pesanan: nextNomorPesanan,
-            status: 'Belum Diterima',
-          });
-
-        if (!insertError) {
-          insertSuccess = true;
-        } else {
-          if (insertError.code === '23505' && attempts < maxAttempts) {
-            // Lanjutkan loop dengan nomor berikutnya jika terjadi duplikasi kunci unik
-            continue;
-          } else {
-            throw insertError;
-          }
-        }
-      }
-
-      if (!insertSuccess) {
-        throw new Error('Gagal menghasilkan nomor pesanan unik yang aman.');
-      }
+      if (insertError) throw insertError;
 
       // [PENGALIHAN CEPAT KE /pesanan DENGAN FLASH TOAST]: Menyimpan pesan sukses dan langsung redirect tanpa jeda
       localStorage.setItem('flash_toast', 'Pesanan berhasil dibuat! Status: Belum Diterima pemilik.');
