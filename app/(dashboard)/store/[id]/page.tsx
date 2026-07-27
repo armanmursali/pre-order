@@ -80,6 +80,11 @@ export default function StoreDetailPage() {
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
+  // [STATE FOLLOWER PEMILIK TOKO]: Menyimpan jumlah pengikut dan daftar nama/email pengikut toko ini
+  const [followerCount, setFollowerCount] = useState<number>(0);
+  const [followerList, setFollowerList] = useState<any[]>([]);
+  const [isFollowerListOpen, setIsFollowerListOpen] = useState<boolean>(false);
+
   const [productFormData, setProductFormData] = useState({
     nama: '',
     jenis_produk_id: '',
@@ -98,6 +103,7 @@ export default function StoreDetailPage() {
       if (!session?.user) return;
 
       fetchAllData(params.id);
+      fetchFollowerData(params.id);
 
       channel = supabase
         .channel(`realtime-store-detail-${params.id}`)
@@ -124,6 +130,37 @@ export default function StoreDetailPage() {
       }
     };
   }, [params?.id]);
+
+  // [FUNGSI AMBIL DATA FOLLOWER TOKO]: Mengambil jumlah dan daftar user yang mengikuti toko ini
+  const fetchFollowerData = async (tokoId: string) => {
+    try {
+      const { count, error: countErr } = await supabase
+        .from('follower_toko')
+        .select('*', { count: 'exact', head: true })
+        .eq('id_toko', tokoId);
+
+      if (!countErr && count !== null) {
+        setFollowerCount(count);
+      }
+
+      // Ambil detail data user yang mem-follow dengan join ke tabel users
+      const { data: followData, error: followErr } = await supabase
+        .from('follower_toko')
+        .select('id_users, users(nama, email)')
+        .eq('id_toko', tokoId);
+
+      if (!followErr && followData) {
+        const formattedFollowers = followData.map((f: any) => ({
+          user_id: f.id_users,
+          nama: f.users?.nama || 'Pengguna',
+          email: f.users?.email || 'Email tidak tersedia',
+        }));
+        setFollowerList(formattedFollowers);
+      }
+    } catch (err) {
+      console.error('Gagal mengambil data pengikut:', err);
+    }
+  };
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
@@ -654,7 +691,16 @@ export default function StoreDetailPage() {
           </div>
 
           <div className="w-full md:w-2/3 flex flex-col">
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-2">{toko.nama}</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900">{toko.nama}</h2>
+              
+              {/* [INFO JUMLAH FOLLOWER PADA DETAIL PEMILIK]: Menampilkan total pengikut toko */}
+              <div className="bg-orange-50 border border-orange-200 px-3.5 py-1.5 rounded-xl flex items-center gap-2 self-start sm:self-center">
+                <i className="fa-solid fa-users text-orange-600 text-xs"></i>
+                <span className="text-xs font-bold text-gray-800">{followerCount} Pengikut</span>
+              </div>
+            </div>
+
             <p className="text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6 flex items-center gap-2">
               <i className="fa-regular fa-calendar-days"></i>
               Terdaftar pada {new Date(toko.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
@@ -862,6 +908,42 @@ export default function StoreDetailPage() {
           </>
         )}
       </div>
+
+      {/* [PANEL DAFTAR PENGGIKUT TOKO]: Menampilkan daftar user yang mengikuti toko Anda */}
+      {isOwner && (
+        <div className="bg-sky-50/60 rounded-xl shadow-sm border border-sky-200">
+          <button
+            onClick={() => setIsFollowerListOpen(!isFollowerListOpen)}
+            className="w-full px-4 sm:px-6 py-3.5 flex items-center justify-between text-left font-bold text-sky-900 bg-sky-100/50 hover:bg-sky-100 transition-colors text-xs sm:text-sm rounded-xl"
+          >
+            <span className="flex items-center gap-2">
+              <i className="fa-solid fa-user-group text-sky-800"></i> 
+              Daftar Pengikut Toko / Followers ({followerList.length})
+            </span>
+            <i className={`fa-solid fa-chevron-down transition-transform ${isFollowerListOpen ? 'rotate-180' : ''}`}></i>
+          </button>
+
+          {isFollowerListOpen && (
+            <div className="p-4 sm:p-6 divide-y divide-sky-100 overflow-visible">
+              {followerList.length === 0 ? (
+                <p className="text-xs sm:text-sm text-gray-500 italic py-2">Belum ada pengikut di toko ini.</p>
+              ) : (
+                followerList.map((follower: any) => (
+                  <div key={follower.user_id} className="py-3 flex items-center justify-between gap-3">
+                    <div className="overflow-hidden">
+                      <h4 className="font-bold text-gray-900 text-xs sm:text-sm">{follower.nama}</h4>
+                      <p className="text-[11px] sm:text-xs text-gray-500 mt-0.5">{follower.email}</p>
+                    </div>
+                    <span className="bg-sky-100 text-sky-800 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide">
+                      Pengikut
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Panel Daftar Anggota di Bagian Bawah Detail Toko */}
       {isOwner && (
