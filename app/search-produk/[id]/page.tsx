@@ -161,7 +161,7 @@ export default function PublicProductDetailPage() {
     setShowConfirmModal(true);
   };
 
-  // [FUNGSI PROSES PEMESANAN / TRANSAKSI]: Menyimpan data pesanan (nomor_pesanan digenerate otomatis oleh trigger database)
+  // [FUNGSI PROSES PEMESANAN / TRANSAKSI]: Menyimpan data pesanan (nomor_pesanan otomatis di-handle oleh database trigger)
   const executeCheckout = async () => {
     if (!produk || isSubmitting) return;
 
@@ -198,7 +198,7 @@ export default function PublicProductDetailPage() {
 
       const totalHarga = produk.harga * jumlah;
 
-      // [INSERT DATA KE DATABASE]: Nomor pesanan otomatis ditangani secara aman oleh trigger basis data
+      // [INSERT DATA KE DATABASE]: Mengirim data transaksi (error RLS tidak akan muncul lagi setelah SQL Policy dijalankan)
       const { error: insertError } = await supabase
         .from('pesanan')
         .insert({
