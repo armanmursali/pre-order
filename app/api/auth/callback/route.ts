@@ -43,35 +43,35 @@ export async function GET(request: Request) {
     if (!error && sessionData?.user) {
       const authUser = sessionData.user;
 
-      // [LOGIKA TAMBAHAN]: Memeriksa dan mengisi password string acak jika belum ada pada tabel kustom users
+      // [LOGIKA DIPERBAIKI]: Menggunakan metode upsert yang andal untuk memastikan password acak terisi di tabel users
       try {
-        const { data: existingUser, error: fetchUserError } = await supabase
+        const generateRandomPassword = () => {
+          return Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2) + Date.now().toString(36);
+        };
+
+        // 1. Cek dulu apakah data user sudah ada untuk mengambil password lamanya jika ada
+        const { data: existingUser } = await supabase
           .from('users')
-          .select('id, password, nama')
+          .select('password')
           .eq('id', authUser.id)
           .maybeSingle();
 
-        if (!fetchUserError) {
-          // [PERBAIKAN SINTAKS]: Menghasilkan string acak dengan sintaks substring yang benar
-          const generateRandomPassword = () => {
-            return Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2) + Date.now().toString(36);
-          };
-
-          if (!existingUser) {
-            // Jika baris user di tabel kustom belum ada sama sekali, buat baru dengan password acak
-            await supabase.from('users').insert({
+        // 2. Jika password belum ada atau barisnya belum ada, lakukan upsert dengan password acak baru
+        if (!existingUser || !existingUser.password) {
+          const randomPassword = generateRandomPassword();
+          
+          const { error: upsertError } = await supabase
+            .from('users')
+            .upsert({
               id: authUser.id,
               nama: authUser.user_metadata?.full_name || authUser.user_metadata?.name || 'Pengguna',
               email: authUser.email || '',
-              password: generateRandomPassword(),
+              password: randomPassword,
               updated_at: new Date().toISOString(),
-            });
-          } else if (!existingUser.password) {
-            // Jika baris sudah ada tetapi kolom password masih kosong/null, perbarui dengan password acak
-            await supabase.from('users').update({
-              password: generateRandomPassword(),
-              updated_at: new Date().toISOString(),
-            }).eq('id', authUser.id);
+            }, { onConflict: 'id' });
+
+          if (upsertError) {
+            console.error('Gagal melakukan upsert password users:', upsertError.message);
           }
         }
       } catch (dbErr) {
