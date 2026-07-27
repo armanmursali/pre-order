@@ -33,9 +33,9 @@ interface PesananMasuk {
     nama: string;
     konfigurasi_pertanyaan?: any[];
   };
-  // [PERBAIKAN]: Menyesuaikan antarmuka agar hanya menerima 'nama' sesuai database Anda
   users?: {
     nama?: string;
+    email?: string;
   };
 }
 
@@ -79,7 +79,6 @@ export default function PesananMasukPage() {
         return;
       }
 
-      // 1. Ambil daftar toko yang dimiliki oleh user yang sedang login
       const { data: tokoData, error: tokoError } = await supabase
         .from('toko')
         .select('id, nama')
@@ -92,11 +91,9 @@ export default function PesananMasukPage() {
       if (tokoData && tokoData.length > 0) {
         const tokoIds = tokoData.map(t => t.id);
 
-        // 2. Ambil pesanan yang masuk ke toko tersebut
-        // [PERBAIKAN]: Menghapus pengambilan 'name' dan 'full_name', murni hanya memanggil 'users(nama)'
         const { data: pesananData, error: pesananError } = await supabase
           .from('pesanan')
-          .select('*, produk(nama, foto), toko(nama, konfigurasi_pertanyaan), users(nama)')
+          .select('*, produk(nama, foto), toko(nama, konfigurasi_pertanyaan), users(nama, email)')
           .in('toko_id', tokoIds)
           .order('nomor_pesanan', { ascending: true });
 
@@ -155,13 +152,12 @@ export default function PesananMasukPage() {
     }).format(date);
   };
 
-  // [FUNGSI BANTUAN]: Membaca nama pembeli murni dari kolom 'nama' saja
   const getNamaPembeli = (pesanan: PesananMasuk) => {
-    // [PERBAIKAN]: Hanya memvalidasi dan mengambil dari pesanan.users.nama
-    if (pesanan.users && pesanan.users.nama) {
-      return pesanan.users.nama;
+    if (pesanan.users) {
+      if (pesanan.users.nama) return pesanan.users.nama;
+      if (pesanan.users.email) return pesanan.users.email;
     }
-    return `User: ${pesanan.pembeli_id?.substring(0, 8)}...`;
+    return `User Tidak Dikenal`;
   };
 
   const pesananDitampilkan = daftarPesanan.filter(p => {
@@ -224,6 +220,106 @@ export default function PesananMasukPage() {
     setDraggedCol(null);
   };
 
+  // [FUNGSI BANTUAN EKSPOR]: Mengambil nilai string mentah (raw text) dari setiap sel
+  const getRawCellValue = (pesanan: PesananMasuk, colId: string): string => {
+    switch (colId) {
+      case 'nomor_pesanan': return String(pesanan.nomor_pesanan);
+      case 'toko': return pesanan.toko?.nama || '-';
+      case 'nama_pembeli': return getNamaPembeli(pesanan);
+      case 'telepon': return pesanan.telepon_pembeli || '-';
+      case 'alamat': return pesanan.alamat_pembeli || '-';
+      case 'produk': return pesanan.produk?.nama || '-';
+      case 'jumlah': return String(pesanan.jumlah);
+      case 'total_harga': return formatRupiah(pesanan.total_harga);
+      case 'metode': return pesanan.metode_pilihan;
+      case 'status': return pesanan.status;
+      case 'waktu': return formatDate(pesanan.created_at);
+      case 'aksi': return ''; // Aksi tidak ikut diekspor
+      default:
+        if (colId.startsWith('dyn_')) {
+          const qKey = colId.replace('dyn_', '');
+          return pesanan.jawaban_pertanyaan?.[qKey] ? String(pesanan.jawaban_pertanyaan[qKey]) : '-';
+        }
+        return '-';
+    }
+  };
+
+  // [FUNGSI EKSPOR]: Ekspor ke Excel (Format CSV agar kompatibel secara murni tanpa library pihak ke-3)
+  const handleExportExcel = () => {
+    const colsToExport = activeColumns.filter(c => c.id !== 'aksi');
+    if (colsToExport.length === 0) return showToast('Pilih setidaknya satu kolom untuk diekspor', 'error');
+
+    // Buat baris header
+    const headerRow = colsToExport.map(c => `"${c.label}"`).join(',');
+    
+    // Buat baris data
+    const dataRows = pesananDitampilkan.map(pesanan => {
+      return colsToExport.map(col => {
+        const rawValue = getRawCellValue(pesanan, col.id);
+        // Meloloskan (escape) karakter kutip ganda
+        return `"${rawValue.replace(/"/g, '""')}"`;
+      }).join(',');
+    });
+
+    const csvContent = [headerRow, ...dataRows].join('\n');
+    
+    // Memicu unduhan via Blob
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Laporan_Pesanan_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('Berhasil diekspor ke format Excel (CSV)', 'success');
+  };
+
+  // [FUNGSI EKSPOR]: Ekspor ke PDF (Via antarmuka Print Browser asli)
+  const handleExportPDF = () => {
+    const colsToExport = activeColumns.filter(c => c.id !== 'aksi');
+    if (colsToExport.length === 0) return showToast('Pilih setidaknya satu kolom untuk diekspor', 'error');
+
+    let html = '<table border="1" style="border-collapse: collapse; width: 100%; font-family: sans-serif; font-size: 12px; text-align: left;">';
+    
+    // Susun Header
+    html += '<thead><tr style="background-color: #f3f4f6;">';
+    colsToExport.forEach(c => {
+      html += `<th style="padding: 8px;">${c.label}</th>`;
+    });
+    html += '</tr></thead>';
+
+    // Susun Body
+    html += '<tbody>';
+    pesananDitampilkan.forEach(pesanan => {
+      html += '<tr>';
+      colsToExport.forEach(col => {
+        html += `<td style="padding: 8px;">${getRawCellValue(pesanan, col.id)}</td>`;
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+
+    // Buka jendela baru untuk memicu Print / Save as PDF
+    const printWindow = window.open('', '', 'height=600,width=800');
+    if (printWindow) {
+      printWindow.document.write('<html><head><title>Cetak / PDF Pesanan</title></head><body style="padding: 20px;">');
+      printWindow.document.write('<h2 style="font-family: sans-serif; color: #333;">Laporan Pesanan Masuk</h2>');
+      printWindow.document.write('<p style="font-family: sans-serif; font-size: 12px; color: #666;">Dicetak pada: ' + new Date().toLocaleString() + '</p>');
+      printWindow.document.write(html);
+      printWindow.document.write('</body></html>');
+      printWindow.document.close();
+      printWindow.focus();
+      // Jeda sejenak agar konten ter-render sebelum memanggil print dialog
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 250);
+    } else {
+      showToast('Gagal membuka pop-up PDF. Izinkan pop-up pada browser Anda.', 'error');
+    }
+  };
+
   const renderTableCell = (pesanan: PesananMasuk, colId: string) => {
     switch (colId) {
       case 'nomor_pesanan':
@@ -272,7 +368,8 @@ export default function PesananMasukPage() {
       default:
         if (colId.startsWith('dyn_')) {
           const qKey = colId.replace('dyn_', '');
-          return <span className="italic">{pesanan.jawaban_pertanyaan?.[qKey] ? String(pesanan.jawaban_pertanyaan[qKey]) : '-'}</span>;
+          // [PERBAIKAN]: Menghilangkan gaya huruf miring (italic)
+          return <span>{pesanan.jawaban_pertanyaan?.[qKey] ? String(pesanan.jawaban_pertanyaan[qKey]) : '-'}</span>;
         }
         return '-';
     }
@@ -290,100 +387,124 @@ export default function PesananMasukPage() {
   return (
     <div className="space-y-6 relative p-0.5 sm:p-6 bg-transparent text-gray-900 min-h-screen">
       
-      {/* Header & Interaksi Atas */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center text-lg shadow-inner">
-            <i className="fa-solid fa-inbox"></i>
+      {/* Kumpulan Header & Filter (Sekarang dipisah menjadi dua kotak agar rapi dan responsif) */}
+      <div className="space-y-4">
+        
+        {/* Kotak 1: Judul, Toggle View Mode, & Dropdown Toko */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center text-lg shadow-inner">
+              <i className="fa-solid fa-inbox"></i>
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-amber-900">Pesanan Masuk</h1>
+              <p className="text-xs text-gray-500">Kelola semua pesanan dari pelanggan Anda</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-amber-900">Pesanan Masuk</h1>
-            <p className="text-xs text-gray-500">Kelola semua pesanan dari pelanggan Anda</p>
+
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+            <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200 w-full sm:w-auto justify-center">
+              <button 
+                onClick={() => setViewMode('card')}
+                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all flex-1 sm:flex-none ${viewMode === 'card' ? 'bg-white shadow-sm text-orange-600' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                <i className="fa-solid fa-list mr-1"></i> Card
+              </button>
+              <button 
+                onClick={() => setViewMode('table')}
+                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all flex-1 sm:flex-none ${viewMode === 'table' ? 'bg-white shadow-sm text-orange-600' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                <i className="fa-solid fa-table mr-1"></i> Tabel
+              </button>
+            </div>
+
+            <div className="w-full sm:w-auto flex items-center gap-2">
+              <label htmlFor="filterToko" className="text-xs font-semibold text-gray-600 whitespace-nowrap hidden xl:block">
+                Filter Toko:
+              </label>
+              <select
+                id="filterToko"
+                value={selectedTokoId}
+                onChange={(e) => setSelectedTokoId(e.target.value)}
+                className="w-full sm:w-48 px-3 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm bg-white text-gray-900 outline-none focus:ring-2 focus:ring-orange-500 shadow-sm"
+              >
+                <option value="semua">Semua Toko Saya</option>
+                {daftarToko.map((toko) => (
+                  <option key={toko.id} value={toko.id}>
+                    {toko.nama}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto flex-wrap">
-          
-          <div className="relative w-full sm:w-56">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <i className="fa-solid fa-magnifying-glass text-gray-400"></i>
+        {/* Kotak 2: Container Pencarian Tersendiri (Rapih & Responsif) */}
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+          <div className="relative w-full">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+              <i className="fa-solid fa-magnifying-glass text-gray-400 text-sm"></i>
             </div>
             <input
               type="text"
-              placeholder="Cari nama atau nomor..."
+              placeholder="Cari pesanan berdasarkan nama pembeli atau nomor pesanan..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm bg-gray-50 text-gray-900 outline-none focus:bg-white focus:ring-2 focus:ring-orange-500 transition-all shadow-sm"
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm bg-gray-50 text-gray-900 outline-none focus:bg-white focus:ring-2 focus:ring-orange-500 transition-all shadow-sm"
             />
           </div>
-
-          <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200 w-full sm:w-auto justify-center">
-            <button 
-              onClick={() => setViewMode('card')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all flex-1 sm:flex-none ${viewMode === 'card' ? 'bg-white shadow-sm text-orange-600' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              <i className="fa-solid fa-list mr-1"></i> Card
-            </button>
-            <button 
-              onClick={() => setViewMode('table')}
-              className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all flex-1 sm:flex-none ${viewMode === 'table' ? 'bg-white shadow-sm text-orange-600' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              <i className="fa-solid fa-table mr-1"></i> Tabel
-            </button>
-          </div>
-
-          <div className="w-full sm:w-auto flex items-center gap-2">
-            <label htmlFor="filterToko" className="text-xs font-semibold text-gray-600 whitespace-nowrap hidden xl:block">
-              Filter Toko:
-            </label>
-            <select
-              id="filterToko"
-              value={selectedTokoId}
-              onChange={(e) => setSelectedTokoId(e.target.value)}
-              className="w-full sm:w-48 px-3 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm bg-white text-gray-900 outline-none focus:ring-2 focus:ring-orange-500 shadow-sm"
-            >
-              <option value="semua">Semua Toko Saya</option>
-              {daftarToko.map((toko) => (
-                <option key={toko.id} value={toko.id}>
-                  {toko.nama}
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
+
       </div>
 
-      {/* Konfigurasi Kolom Dinamis (Hanya muncul jika mode Tabel) */}
+      {/* Konfigurasi Kolom Dinamis & Tombol Ekspor (Hanya muncul jika mode Tabel) */}
       {viewMode === 'table' && daftarPesanan.length > 0 && (
         <div className="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-gray-200 space-y-4">
           
-          <div>
-            <h3 className="text-xs font-bold text-gray-700 mb-2 uppercase tracking-wider border-b border-gray-100 pb-1.5">
-              <i className="fa-solid fa-arrows-up-down-left-right mr-1.5"></i> Urutan Kolom Aktif (Geser untuk mengatur posisi)
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-gray-100 pb-2">
+            <h3 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+              <i className="fa-solid fa-arrows-up-down-left-right mr-1.5"></i> Urutan Kolom Aktif (Geser untuk mengatur)
             </h3>
-            <div className="flex flex-wrap gap-2">
-              {activeColumns.map(col => (
-                <div 
-                  key={col.id}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, col.id)}
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, col.id)}
-                  className="flex items-center gap-2 text-xs text-orange-800 bg-orange-50 border border-orange-200 px-3 py-1.5 rounded-lg cursor-grab active:cursor-grabbing hover:bg-orange-100 transition-colors shadow-sm"
-                >
-                  <i className="fa-solid fa-grip-vertical text-orange-400"></i>
-                  <span className="font-semibold select-none">{col.label}</span>
-                  <button onClick={() => toggleColumn(col.id)} className="ml-1 text-orange-400 hover:text-red-500" title="Sembunyikan Kolom">
-                    <i className="fa-solid fa-xmark"></i>
-                  </button>
-                </div>
-              ))}
+            
+            {/* [PERBAIKAN]: Tombol Aksi Ekspor (PDF & Excel) */}
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button 
+                onClick={handleExportExcel}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 rounded-lg text-xs font-bold transition-colors shadow-sm"
+              >
+                <i className="fa-solid fa-file-excel"></i> Export CSV
+              </button>
+              <button 
+                onClick={handleExportPDF}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 rounded-lg text-xs font-bold transition-colors shadow-sm"
+              >
+                <i className="fa-solid fa-file-pdf"></i> Export PDF
+              </button>
             </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {activeColumns.map(col => (
+              <div 
+                key={col.id}
+                draggable
+                onDragStart={(e) => handleDragStart(e, col.id)}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, col.id)}
+                className="flex items-center gap-2 text-xs text-orange-800 bg-orange-50 border border-orange-200 px-3 py-1.5 rounded-lg cursor-grab active:cursor-grabbing hover:bg-orange-100 transition-colors shadow-sm"
+              >
+                <i className="fa-solid fa-grip-vertical text-orange-400"></i>
+                <span className="font-semibold select-none">{col.label}</span>
+                <button onClick={() => toggleColumn(col.id)} className="ml-1 text-orange-400 hover:text-red-500" title="Sembunyikan Kolom">
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </div>
+            ))}
           </div>
 
           {availableColumns.length > 0 && (
             <div>
-              <h3 className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider border-b border-gray-100 pb-1.5">
+              <h3 className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider border-b border-gray-100 pb-1.5 mt-2">
                 <i className="fa-solid fa-plus mr-1.5"></i> Kolom Tersedia (Klik untuk menambahkan)
               </h3>
               <div className="flex flex-wrap gap-2">
@@ -394,6 +515,7 @@ export default function PesananMasukPage() {
                     className="flex items-center gap-1.5 text-xs text-gray-600 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-gray-100 hover:text-gray-900 transition-colors"
                   >
                     <i className="fa-solid fa-plus text-gray-400"></i>
+                    {/* [PERBAIKAN]: Menghilangkan gaya miring (italic) pada label tambahan */}
                     <span className="font-medium select-none">{col.label}</span>
                   </button>
                 ))}
@@ -447,7 +569,7 @@ export default function PesananMasukPage() {
                   {pesananDitampilkan.map((pesanan, idx) => (
                     <tr key={pesanan.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-orange-50/50 border-b border-gray-100 transition-colors`}>
                       {activeColumns.map(col => (
-                        <td key={`td_${pesanan.id}_${col.id}`} className={`p-3 border-r border-gray-100 last:border-r-0 ${col.id.startsWith('dyn_') ? 'bg-amber-50/30' : ''}`}>
+                        <td key={`td_${pesanan.id}_${col.id}`} className={`p-3 border-r border-gray-100 last:border-r-0`}>
                           {renderTableCell(pesanan, col.id)}
                         </td>
                       ))}
