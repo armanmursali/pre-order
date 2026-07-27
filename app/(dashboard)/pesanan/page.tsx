@@ -5,9 +5,11 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
+import Paginator from '@/components/Paginator';
 
 interface PesananItem {
   id: string;
+  toko_id: string; // [PERBAIKAN]: Memastikan toko_id tersedia untuk kebutuhan penyesuaian nomor antrean
   nomor_pesanan: number;
   jumlah: number;
   total_harga: number;
@@ -38,14 +40,16 @@ export default function PesananPage() {
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // [PERBAIKAN]: State untuk mengontrol Modal Hapus Khusus (ketik HAPUS & hitung mundur 5 detik)
   const [deleteModalVisible, setDeleteModalVisible] = useState<boolean>(false);
   const [selectedDeletePesanan, setSelectedDeletePesanan] = useState<PesananItem | null>(null);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState<string>('');
   const [deleteCountdown, setDeleteCountdown] = useState<number>(5);
   const [isProcessingAction, setIsProcessingAction] = useState<boolean>(false);
 
-  // [PERBAIKAN]: Mengeluarkan fungsi fetchUserPesanan dari dalam useEffect agar dapat dipanggil kembali (re-fetch) setelah pesanan dihapus
+  // State untuk Pagination
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [itemsPerPage, setItemsPerPage] = useState<number>(25);
+
   const fetchUserPesanan = async () => {
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -94,7 +98,6 @@ export default function PesananPage() {
     }
   };
 
-  // [EFEK FLASH TOAST & FETCH PESANAN]: Menangkap flash toast dari localStorage dan mengambil data pesanan awal
   useEffect(() => {
     const flashMessage = localStorage.getItem('flash_toast');
     if (flashMessage) {
@@ -106,7 +109,6 @@ export default function PesananPage() {
     fetchUserPesanan();
   }, [router, supabase]);
 
-  // [PERBAIKAN]: Effect untuk menjalankan hitung mundur otomatis saat Modal Hapus terbuka
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (deleteModalVisible && deleteCountdown > 0) {
@@ -125,7 +127,6 @@ export default function PesananPage() {
     }).format(angka);
   };
 
-  // [PERBAIKAN]: Fungsi untuk membuka Modal Delete Khusus dari sisi pembeli
   const openDeleteModal = (pesanan: PesananItem) => {
     setSelectedDeletePesanan(pesanan);
     setDeleteConfirmationText('');
@@ -133,19 +134,18 @@ export default function PesananPage() {
     setDeleteModalVisible(true);
   };
 
-  // [PERBAIKAN]: Logika Utama Hapus Pesanan Secara Dinamis & Update Nomor Antrean
+  // [PERBAIKAN]: Logika Hapus Pesanan Pembeli dengan Penanganan Error Supabase & Penurunan Nomor Antrean Dinamis
   const executeDeletePesanan = async () => {
     if (!selectedDeletePesanan || deleteConfirmationText !== 'HAPUS') return;
     setIsProcessingAction(true);
     
     try {
       const deletedNomor = selectedDeletePesanan.nomor_pesanan;
-      // Memastikan toko ada untuk menelusuri antrean di toko yang sama
-      const currentTokoId = (selectedDeletePesanan as any).toko_id; 
+      const currentTokoId = selectedDeletePesanan.toko_id; 
 
       if (!currentTokoId) throw new Error("ID Toko tidak terdeteksi pada pesanan ini.");
 
-      // 1. Eksekusi hapus pesanan utama (Pembeli membatalkan pesanan)
+      // 1. Eksekusi hapus pesanan utama di database
       const { error: deleteError } = await supabase
         .from('pesanan')
         .delete()
@@ -154,33 +154,49 @@ export default function PesananPage() {
       if (deleteError) throw deleteError;
 
       // 2. Ambil semua pesanan lain di toko yang sama yang nomor_pesanannya lebih besar
-      const { data: toUpdate } = await supabase
+      const { data: toUpdate, error: fetchError } = await supabase
         .from('pesanan')
         .select('id, nomor_pesanan')
         .eq('toko_id', currentTokoId)
         .gt('nomor_pesanan', deletedNomor);
 
+      if (fetchError) throw fetchError;
+
       // 3. Lakukan update perulangan untuk menurunkan nomor antrean
       if (toUpdate && toUpdate.length > 0) {
         for (const item of toUpdate) {
-          await supabase
+          const { error: updateError } = await supabase
             .from('pesanan')
             .update({ nomor_pesanan: item.nomor_pesanan - 1 })
             .eq('id', item.id);
+
+          if (updateError) throw updateError;
         }
       }
       
       setToast({ message: 'Pesanan berhasil dibatalkan dan dihapus.', type: 'success' });
       setDeleteModalVisible(false);
       
-      // Memuat ulang data pesanan agar tampilan ter-update otomatis
+      if (paginatedPesanan.length === 1 && currentPage > 1) {
+        setCurrentPage((prev) => prev - 1);
+      }
+
       fetchUserPesanan();
     } catch (err: any) {
-      setToast({ message: 'Gagal membatalkan pesanan: ' + err.message, type: 'error' });
+      setToast({ message: 'Gagal membatalkan pesanan: ' + (err.message || JSON.stringify(err)), type: 'error' });
+      console.error('Error saat membatalkan pesanan:', err);
     } finally {
       setIsProcessingAction(false);
     }
   };
+
+  // Kalkulasi data untuk Pagination
+  const totalItems = pesananList.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const paginatedPesanan = pesananList.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   if (loading) {
     return (
@@ -193,7 +209,6 @@ export default function PesananPage() {
 
   return (
     <div className="space-y-6 bg-white text-gray-900 min-h-screen p-0.5 sm:p-6">
-      {/* Header Halaman Pesanan */}
       <div className="rounded-xl bg-white p-6 shadow-sm border border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-amber-900 mb-1">
@@ -212,7 +227,6 @@ export default function PesananPage() {
         </Link>
       </div>
 
-      {/* Daftar Pesanan */}
       {pesananList.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl border border-gray-200 text-gray-500 shadow-sm">
           <i className="fa-solid fa-receipt text-4xl mb-3 text-gray-300 block"></i>
@@ -226,94 +240,104 @@ export default function PesananPage() {
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4">
-          {pesananList.map((item) => (
-            <div 
-              key={item.id} 
-              className="bg-white border border-gray-200 rounded-xl shadow-sm hover:border-orange-200 transition-all p-4 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6"
-            >
-              {/* Bagian Kiri: Info Produk & Toko */}
-              <div className="flex items-start gap-4 flex-grow w-full md:w-auto">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center border border-gray-200 cursor-pointer" onClick={() => item.produk?.foto && setPreviewImageUrl(item.produk.foto)}>
-                  {item.produk?.foto ? (
-                    <img src={item.produk.foto} alt={item.produk.nama} className="w-full h-full object-cover" />
-                  ) : (
-                    <i className="fa-solid fa-box text-xl text-gray-400"></i>
-                  )}
-                </div>
-
-                <div className="space-y-1 w-full">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
-                      No. Pesanan: #{item.nomor_pesanan || '-'}
-                    </span>
-                    <span className="text-xs text-gray-500 font-medium">
-                      di Toko <strong className="text-amber-900">{item.toko?.nama || 'Toko'}</strong>
-                    </span>
+        <>
+          <div className="grid grid-cols-1 gap-4">
+            {paginatedPesanan.map((item) => (
+              <div 
+                key={item.id} 
+                className="bg-white border border-gray-200 rounded-xl shadow-sm hover:border-orange-200 transition-all p-4 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6"
+              >
+                <div className="flex items-start gap-4 flex-grow w-full md:w-auto">
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center border border-gray-200 cursor-pointer" onClick={() => item.produk?.foto && setPreviewImageUrl(item.produk.foto)}>
+                    {item.produk?.foto ? (
+                      <img src={item.produk.foto} alt={item.produk.nama} className="w-full h-full object-cover" />
+                    ) : (
+                      <i className="fa-solid fa-box text-xl text-gray-400"></i>
+                    )}
                   </div>
 
-                  <h3 className="text-base font-bold text-gray-900">
-                    {item.produk?.nama || 'Produk'}
-                  </h3>
+                  <div className="space-y-1 w-full">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
+                        No. Pesanan: #{item.nomor_pesanan || '-'}
+                      </span>
+                      <span className="text-xs text-gray-500 font-medium">
+                        di Toko <strong className="text-amber-900">{item.toko?.nama || 'Toko'}</strong>
+                      </span>
+                    </div>
 
-                  <p className="text-xs text-gray-500">
-                    Jumlah: <strong className="text-gray-900">{item.jumlah} item</strong> | Total: <strong className="text-amber-900">{formatRupiah(item.total_harga)}</strong>
-                  </p>
+                    <h3 className="text-base font-bold text-gray-900">
+                      {item.produk?.nama || 'Produk'}
+                    </h3>
 
-                  <p className="text-[11px] text-gray-400">
-                    Metode: <span className="font-semibold text-gray-700">{item.metode_pilihan}</span> | Tanggal: {new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                </div>
-              </div>
+                    <p className="text-xs text-gray-500">
+                      Jumlah: <strong className="text-gray-900">{item.jumlah} item</strong> | Total: <strong className="text-amber-900">{formatRupiah(item.total_harga)}</strong>
+                    </p>
 
-              {/* Bagian Kanan: Status, Bukti Transfer, & Tombol Hapus */}
-              <div className="flex flex-col sm:flex-row md:flex-col items-end justify-between w-full md:w-auto gap-3 border-t md:border-t-0 pt-3 md:pt-0 border-gray-100">
-                
-                <div className="flex flex-col items-end gap-2 w-full">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500">Status:</span>
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                      item.status === 'Sudah Diterima' 
-                        ? 'bg-green-100 text-green-800 border border-green-200' 
-                        : 'bg-amber-100 text-amber-800 border border-amber-200'
-                    }`}>
-                      {item.status || 'Belum Diterima'}
-                    </span>
+                    <p className="text-[11px] text-gray-400">
+                      Metode: <span className="font-semibold text-gray-700">{item.metode_pilihan}</span> | Tanggal: {new Date(item.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 w-full justify-end">
-                  {item.bukti_transfer && (
-                    <button
-                      type="button"
-                      onClick={() => setPreviewImageUrl(item.bukti_transfer!)}
-                      className="text-xs text-blue-600 hover:text-blue-700 font-semibold flex items-center gap-1.5 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 transition-colors"
-                    >
-                      <i className="fa-solid fa-image"></i>
-                      <span className="hidden sm:inline">Bukti Transfer</span>
-                    </button>
-                  )}
+                <div className="flex flex-col sm:flex-row md:flex-col items-end justify-between w-full md:w-auto gap-3 border-t md:border-t-0 pt-3 md:pt-0 border-gray-100">
                   
-                  {/* [PERBAIKAN]: Tombol Batalkan Pesanan (Hanya tampil jika Status masih "Belum Diterima") */}
-                  {item.status === 'Belum Diterima' && (
-                    <button
-                      type="button"
-                      onClick={() => openDeleteModal(item)}
-                      className="text-xs text-red-600 hover:text-white font-semibold flex items-center gap-1.5 bg-red-50 hover:bg-red-600 px-3 py-1.5 rounded-lg border border-red-200 transition-colors"
-                    >
-                      <i className="fa-solid fa-trash-can"></i>
-                      <span>Batalkan Pesanan</span>
-                    </button>
-                  )}
-                </div>
+                  <div className="flex flex-col items-end gap-2 w-full">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500">Status:</span>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        item.status === 'Sudah Diterima' 
+                          ? 'bg-green-100 text-green-800 border border-green-200' 
+                          : 'bg-amber-100 text-amber-800 border border-amber-200'
+                      }`}>
+                        {item.status || 'Belum Diterima'}
+                      </span>
+                    </div>
+                  </div>
 
+                  <div className="flex items-center gap-2 w-full justify-end">
+                    {item.bukti_transfer && (
+                      <button
+                        type="button"
+                        onClick={() => setPreviewImageUrl(item.bukti_transfer!)}
+                        className="text-xs text-blue-600 hover:text-blue-700 font-semibold flex items-center gap-1.5 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 transition-colors"
+                      >
+                        <i className="fa-solid fa-image"></i>
+                        <span className="hidden sm:inline">Bukti Transfer</span>
+                      </button>
+                    )}
+                    
+                    {item.status === 'Belum Diterima' && (
+                      <button
+                        type="button"
+                        onClick={() => openDeleteModal(item)}
+                        className="text-xs text-red-600 hover:text-white font-semibold flex items-center gap-1.5 bg-red-50 hover:bg-red-600 px-3 py-1.5 rounded-lg border border-red-200 transition-colors"
+                      >
+                        <i className="fa-solid fa-trash-can"></i>
+                        <span>Batalkan Pesanan</span>
+                      </button>
+                    )}
+                  </div>
+
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+
+          <Paginator 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onItemsPerPageChange={(newVal) => {
+              setItemsPerPage(newVal);
+              setCurrentPage(1);
+            }}
+          />
+        </>
       )}
 
-      {/* [PERBAIKAN]: Modal Konfirmasi Khusus Hapus (Ketik HAPUS + 5 Detik) */}
       {deleteModalVisible && selectedDeletePesanan && (
         <div className="fixed inset-0 z-[260] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-200 space-y-4 text-center relative">
@@ -372,7 +396,6 @@ export default function PesananPage() {
         </div>
       )}
 
-      {/* Modal Preview Gambar */}
       {previewImageUrl && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md" onClick={() => setPreviewImageUrl(null)}>
           <div className="relative max-w-4xl w-full max-h-[90vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
@@ -392,7 +415,6 @@ export default function PesananPage() {
         </div>
       )}
 
-      {/* Komponen Toast */}
       {toast && (
         <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[200] transition-all duration-300 ease-in-out">
           <div className={`flex items-center gap-2.5 sm:gap-3 px-4 sm:px-5 py-3 sm:py-3.5 rounded-xl shadow-xl text-white font-medium ${

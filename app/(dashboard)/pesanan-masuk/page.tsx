@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Link from 'next/link';
+import Paginator from '../../components/Paginator';
 
 interface Toko {
   id: string;
@@ -67,10 +68,12 @@ export default function PesananMasukPage() {
   const [selectedActionPesanan, setSelectedActionPesanan] = useState<PesananMasuk | null>(null);
   const [isProcessingAction, setIsProcessingAction] = useState<boolean>(false);
 
-  // [PERBAIKAN]: State baru untuk mengontrol Modal Hapus Khusus (ketik HAPUS & hitung mundur 5 detik)
   const [deleteModalVisible, setDeleteModalVisible] = useState<boolean>(false);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState<string>('');
   const [deleteCountdown, setDeleteCountdown] = useState<number>(5);
+
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [itemsPerPage, setItemsPerPage] = useState<number>(25);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
@@ -141,7 +144,6 @@ export default function PesananMasukPage() {
     setQuestionMap(qMap);
   }, [daftarPesanan]);
 
-  // [PERBAIKAN]: Effect untuk menjalankan hitung mundur otomatis saat Delete Modal terbuka
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (deleteModalVisible && deleteCountdown > 0) {
@@ -151,6 +153,10 @@ export default function PesananMasukPage() {
     }
     return () => clearInterval(timer);
   }, [deleteModalVisible, deleteCountdown]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedTokoId]);
 
   const formatRupiah = (angka: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -185,6 +191,13 @@ export default function PesananMasukPage() {
 
     return isTokoMatch && isSearchMatch;
   });
+
+  const totalItems = pesananDitampilkan.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const paginatedPesanan = pesananDitampilkan.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const allPossibleCols = [
     { id: 'nomor_pesanan', label: 'No. Pesanan' },
@@ -346,7 +359,6 @@ export default function PesananMasukPage() {
     }
   };
 
-  // [PERBAIKAN]: Fungsi untuk membuka Modal Delete Khusus
   const openDeleteModal = () => {
     setActionModalVisible(false);
     setDeleteConfirmationText('');
@@ -354,7 +366,6 @@ export default function PesananMasukPage() {
     setDeleteModalVisible(true);
   };
 
-  // [PERBAIKAN]: Logika Utama Hapus Pesanan Secara Dinamis
   const executeDeletePesanan = async () => {
     if (!selectedActionPesanan || deleteConfirmationText !== 'HAPUS') return;
     setIsProcessingAction(true);
@@ -363,7 +374,6 @@ export default function PesananMasukPage() {
       const deletedNomor = selectedActionPesanan.nomor_pesanan;
       const currentTokoId = selectedActionPesanan.toko_id;
 
-      // 1. Eksekusi hapus pesanan utama
       const { error: deleteError } = await supabase
         .from('pesanan')
         .delete()
@@ -371,14 +381,12 @@ export default function PesananMasukPage() {
 
       if (deleteError) throw deleteError;
 
-      // 2. Ambil semua pesanan lain dari toko yang sama yang nomor_pesanannya lebih besar
       const { data: toUpdate } = await supabase
         .from('pesanan')
         .select('id, nomor_pesanan')
         .eq('toko_id', currentTokoId)
         .gt('nomor_pesanan', deletedNomor);
 
-      // 3. Lakukan update perulangan untuk menurunkan nomor antrean
       if (toUpdate && toUpdate.length > 0) {
         for (const item of toUpdate) {
           await supabase
@@ -390,6 +398,11 @@ export default function PesananMasukPage() {
       
       showToast('Pesanan ditolak dan urutan antrean berhasil diperbarui.', 'success');
       setDeleteModalVisible(false);
+      
+      if (paginatedPesanan.length === 1 && currentPage > 1) {
+        setCurrentPage(prev => prev - 1);
+      }
+
       fetchPesananMasuk();
     } catch (err: any) {
       showToast('Gagal menghapus pesanan: ' + err.message, 'error');
@@ -640,7 +653,8 @@ export default function PesananMasukPage() {
                   </tr>
                 </thead>
                 <tbody className="text-xs text-gray-700">
-                  {pesananDitampilkan.map((pesanan, idx) => (
+                  {/* [PERBAIKAN]: Menggunakan paginatedPesanan pada Map */}
+                  {paginatedPesanan.map((pesanan, idx) => (
                     <tr key={pesanan.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-orange-50/50 border-b border-gray-100 transition-colors`}>
                       {activeColumns.map(col => (
                         <td key={`td_${pesanan.id}_${col.id}`} className={`p-3 border-r border-gray-100 last:border-r-0`}>
@@ -654,7 +668,8 @@ export default function PesananMasukPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
-              {pesananDitampilkan.map((pesanan) => (
+              {/* [PERBAIKAN]: Menggunakan paginatedPesanan pada Map */}
+              {paginatedPesanan.map((pesanan) => (
                 <div key={pesanan.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col sm:flex-row">
                   
                   <div className="p-4 bg-gray-50 border-b sm:border-b-0 sm:border-r border-gray-200 w-full sm:w-64 flex-shrink-0 flex items-start gap-4">
@@ -752,6 +767,19 @@ export default function PesananMasukPage() {
               ))}
             </div>
           )}
+
+          {/* [PERBAIKAN]: Memanggil Komponen Paginator Terpisah */}
+          <Paginator 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onItemsPerPageChange={(newVal) => {
+              setItemsPerPage(newVal);
+              setCurrentPage(1);
+            }}
+          />
         </>
       )}
 
@@ -783,7 +811,6 @@ export default function PesananMasukPage() {
                 Terima Pesanan (Update Status)
               </button>
               
-              {/* [PERBAIKAN]: Tombol ini sekarang memanggil openDeleteModal */}
               <button
                 type="button"
                 disabled={isProcessingAction}
@@ -809,7 +836,7 @@ export default function PesananMasukPage() {
         </div>
       )}
 
-      {/* [PERBAIKAN]: Modal Konfirmasi Khusus Hapus (Ketik HAPUS + 5 Detik) */}
+      {/* Modal Konfirmasi Khusus Hapus (Ketik HAPUS + 5 Detik) */}
       {deleteModalVisible && selectedActionPesanan && (
         <div className="fixed inset-0 z-[260] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-200 space-y-4 text-center relative">
