@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
+import { sendNotification } from '@/utils/notificationHelper'; // [HELPER NOTIFIKASI REALTIME]: Mengirim pemberitahuan ke pengguna
 
 interface IzinTokoItem {
   id: string;
@@ -82,25 +83,62 @@ export default function AdminPage() {
     checkAdminAndFetchData();
   }, [router, supabase]);
 
-  // [FUNGSI UBAH STATUS IZIN TOKO]: Mengubah status pengajuan (diterima atau ditolak)
-  const handleUpdateStatusIzin = async (izinId: string, statusBaru: 'diterima' | 'ditolak') => {
+  // [FUNGSI UBAH STATUS IZIN TOKO + KIRIM NOTIFIKASI REALTIME]: Mengubah status dan mengirim notifikasi jika diterima
+  const handleUpdateStatusIzin = async (izin: IzinTokoItem, statusBaru: 'diterima' | 'ditolak') => {
     setIsProcessing(true);
     try {
       const { error } = await supabase
         .from('izin_buat_toko')
         .update({ status: statusBaru })
+        .eq('id', izin.id);
+
+      if (error) throw error;
+
+      // [KIRIM NOTIFIKASI REALTIME KE USER]: Jika status diterima, kirim pemberitahuan bahwa mereka sudah bisa membuat toko
+      if (statusBaru === 'diterima') {
+        await sendNotification(
+          izin.user_id,
+          'Izin Toko Disetujui',
+          'Selamat! Pengajuan izin pembuatan toko Anda telah disetujui oleh Administrator. Sekarang Anda dapat membuat toko baru di menu Store.'
+        );
+      } else {
+        await sendNotification(
+          izin.user_id,
+          'Izin Toko Ditolak',
+          'Mohon maaf, pengajuan izin pembuatan toko Anda belum dapat disetujui oleh Administrator.'
+        );
+      }
+
+      showToast(`Status pengajuan berhasil diubah menjadi ${statusBaru} & notifikasi terkirim!`, 'success');
+
+      // Refresh data lokal
+      setDaftarIzin(prev =>
+        prev.map(item => (item.id === izin.id ? { ...item, status: statusBaru } : item))
+      );
+    } catch (err: any) {
+      showToast('Gagal mengubah status: ' + err.message, 'error');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // [FUNGSI HAPUS PENGAJUAN IZIN]: Menghapus data pengajuan dari database admin
+  const handleDeleteIzin = async (izinId: string) => {
+    if (!confirm('Apakah Anda yakin ingin menghapus data pengajuan izin ini?')) return;
+
+    setIsProcessing(true);
+    try {
+      const { error } = await supabase
+        .from('izin_buat_toko')
+        .delete()
         .eq('id', izinId);
 
       if (error) throw error;
 
-      showToast(`Status pengajuan berhasil diubah menjadi ${statusBaru}!`, 'success');
-
-      // Refresh data lokal
-      setDaftarIzin(prev =>
-        prev.map(item => (item.id === izinId ? { ...item, status: statusBaru } : item))
-      );
+      showToast('Pengajuan izin berhasil dihapus.', 'success');
+      setDaftarIzin(prev => prev.filter(item => item.id !== izinId));
     } catch (err: any) {
-      showToast('Gagal mengubah status: ' + err.message, 'error');
+      showToast('Gagal menghapus pengajuan: ' + err.message, 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -130,7 +168,7 @@ export default function AdminPage() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-amber-900">Panel Administrator</h1>
-            <p className="text-xs text-gray-500">Verifikasi dan kelola permohonan izin pembuatan toko pengguna</p>
+            <p className="text-xs text-gray-500">Verifikasi, kirim notifikasi realtime, dan kelola permohonan izin toko</p>
           </div>
         </div>
         <div className="bg-orange-50 border border-orange-200 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-orange-800">
@@ -155,7 +193,7 @@ export default function AdminPage() {
                 <th className="p-3 border-r border-orange-100">Catatan</th>
                 <th className="p-3 border-r border-orange-100">Bukti Transfer</th>
                 <th className="p-3 border-r border-orange-100">Status</th>
-                <th className="p-3 text-center">Aksi Verifikasi</th>
+                <th className="p-3 text-center">Aksi Verifikasi & Hapus</th>
               </tr>
             </thead>
             <tbody className="text-xs text-gray-700">
@@ -189,7 +227,7 @@ export default function AdminPage() {
                     <div className="flex items-center justify-center gap-2">
                       <button
                         disabled={isProcessing || item.status === 'diterima'}
-                        onClick={() => handleUpdateStatusIzin(item.id, 'diterima')}
+                        onClick={() => handleUpdateStatusIzin(item, 'diterima')}
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1 ${
                           item.status === 'diterima'
                             ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
@@ -201,7 +239,7 @@ export default function AdminPage() {
 
                       <button
                         disabled={isProcessing || item.status === 'ditolak'}
-                        onClick={() => handleUpdateStatusIzin(item.id, 'ditolak')}
+                        onClick={() => handleUpdateStatusIzin(item, 'ditolak')}
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm flex items-center gap-1 ${
                           item.status === 'ditolak'
                             ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
@@ -209,6 +247,15 @@ export default function AdminPage() {
                         }`}
                       >
                         <i className="fa-solid fa-xmark"></i> Tolak
+                      </button>
+
+                      <button
+                        disabled={isProcessing}
+                        onClick={() => handleDeleteIzin(item.id)}
+                        className="px-2.5 py-1.5 bg-gray-100 hover:bg-red-600 hover:text-white text-gray-600 rounded-lg text-xs font-bold transition-colors shadow-sm"
+                        title="Hapus Pengajuan"
+                      >
+                        <i className="fa-solid fa-trash"></i>
                       </button>
                     </div>
                   </td>
@@ -241,6 +288,7 @@ export default function AdminPage() {
         </div>
       )}
 
+      {/* Komponen Toast */}
       {toast && (
         <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[300] transition-all duration-300 ease-in-out">
           <div className={`flex items-center gap-2.5 sm:gap-3 px-4 sm:px-5 py-3 sm:py-3.5 rounded-xl shadow-xl text-white font-medium ${
