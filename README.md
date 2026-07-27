@@ -2,6 +2,8 @@
 
 > **Pesan barang harianmu dengan mudah, cepat, dan efisien.**
 
+🌐 **Demo Aplikasi:** [https://pre-order-snowy.vercel.app/](https://pre-order-snowy.vercel.app/)
+
 Pre-Order adalah aplikasi berbasis web modern yang dirancang untuk mempermudah proses pemesanan barang secara **pre-order**. Aplikasi ini menyediakan sistem terintegrasi untuk pelanggan maupun pemilik toko dalam mengelola produk, pesanan, toko, pendapatan, dan aktivitas operasional secara efektif.
 
 ## 📖 Tentang Aplikasi
@@ -153,11 +155,15 @@ http://localhost:3000
 
 ## 🖼️ Pratinjau Aplikasi
 
-Tampilan dan pratinjau antarmuka aplikasi dapat dilihat melalui aset yang tersedia pada direktori:
+Berikut adalah tampilan antarmuka aplikasi **Pre-Order**:
 
-```text
-public/apk.png
-```
+![Preview Aplikasi](public/apk.png)
+
+## 🌐 Demo Aplikasi
+
+Aplikasi **Pre-Order** dapat dicoba secara langsung melalui link berikut:
+
+👉 **[https://pre-order-snowy.vercel.app/](https://pre-order-snowy.vercel.app/)**
 
 ## 🌐 Deployment
 
