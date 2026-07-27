@@ -83,19 +83,20 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Kolom Kanan: Gambar Interaktif / Animasi dari Sumber Daring (Unsplash Random) */}
+        {/* Kolom Kanan: Ilustrasi Gambar Kartun Vektor dari Sumber Daring */}
         <div className="w-full lg:w-1/2 flex items-center justify-center relative">
           <div className="absolute w-72 h-72 sm:w-96 sm:h-96 bg-orange-200/50 rounded-full blur-3xl -z-10 animate-blob"></div>
           
-          <div className="relative w-full max-w-md aspect-square rounded-3xl overflow-hidden shadow-2xl border-4 border-white transform hover:scale-[1.02] transition-transform duration-500">
+          <div className="relative w-full max-w-md aspect-square rounded-3xl overflow-hidden shadow-2xl border-4 border-white transform hover:scale-[1.02] transition-transform duration-500 bg-amber-100 flex items-center justify-center">
+            {/* [PENGGANTIAN GAMBAR KARTUN]: Menggunakan ilustrasi vektor/kartun belanja dari unDraw/Open Source SVG */}
             <img
-              src="https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=800&q=80"
-              alt="Belanja Barang Harian PT Mances"
+              src="https://img.freepik.com/free-vector/online-grocery-shopping-concept-illustration_114360-14861.jpg?w=800"
+              alt="Ilustrasi Kartun Belanja Harian PT Mances"
               className="w-full h-full object-cover"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex flex-col justify-end p-6 text-white">
-              <span className="text-xs font-bold uppercase tracking-wider text-orange-400">Kualitas Terjamin</span>
-              <h3 className="text-xl font-extrabold">Pasokan Segar Setiap Hari</h3>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent flex flex-col justify-end p-6 text-white">
+              <span className="text-xs font-bold uppercase tracking-wider text-orange-300">Belanja Ceria & Praktis</span>
+              <h3 className="text-xl font-extrabold">Pasokan Harian Dalam Genggaman</h3>
             </div>
           </div>
         </div>

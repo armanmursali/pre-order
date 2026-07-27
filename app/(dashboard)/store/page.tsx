@@ -696,7 +696,7 @@ export default function StorePage() {
             <div className="overflow-y-auto p-4 sm:p-6 space-y-4">
               <div className="p-3.5 bg-orange-50 border border-orange-200 rounded-xl text-xs text-orange-900 space-y-1">
                 <p className="font-bold">Instruksi Pembayaran:</p>
-                <p>Silakan melakukan pembayaran biaya administrasi/izin toko ke DANA e-wallet berikut:</p>
+                <p>Silakan melakukan pembayaran biaya administrasi/izin toko ke DANA e-wallet dengan nominal seikhlasnya di nomor rekening berikut:</p>
                 <p className="font-extrabold text-amber-900 text-sm">Arman Mursali - 082253920610</p>
                 <p className="text-[11px] text-gray-600">Setelah transfer, isi formulir di bawah ini dan unggah bukti pembayarannya.</p>
               </div>
