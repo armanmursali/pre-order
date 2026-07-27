@@ -241,7 +241,6 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Komponen Toast */}
       {toast && (
         <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[300] transition-all duration-300 ease-in-out">
           <div className={`flex items-center gap-2.5 sm:gap-3 px-4 sm:px-5 py-3 sm:py-3.5 rounded-xl shadow-xl text-white font-medium ${
