@@ -45,9 +45,16 @@ export default function PublicStoreDetailPage() {
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
+  // [STATE FOLLOWER TOKO]: Menyimpan status follow, jumlah follower, dan ID user yang sedang login
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isFollowing, setIsFollowing] = useState<boolean>(false);
+  const [followerCount, setFollowerCount] = useState<number>(0);
+  const [isProcessingFollow, setIsProcessingFollow] = useState<boolean>(false);
+
   useEffect(() => {
     if (params?.id) {
       fetchPublicStoreData(params.id);
+      checkUserAndFollowStatus(params.id);
     }
   }, [params?.id]);
 
@@ -62,6 +69,83 @@ export default function PublicStoreDetailPage() {
       currency: 'IDR',
       minimumFractionDigits: 0,
     }).format(angka);
+  };
+
+  // [FUNGSI CEK USER & STATUS FOLLOW]: Memeriksa user aktif dan status apakah sudah mengikuti toko ini serta jumlah total follower
+  const checkUserAndFollowStatus = async (tokoId: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      const userId = session.user.id;
+      setCurrentUserId(userId);
+
+      // Ambil jumlah total follower toko
+      const { count, error: countError } = await supabase
+        .from('follower_toko')
+        .select('*', { count: 'exact', head: true })
+        .eq('id_toko', tokoId);
+
+      if (!countError && count !== null) {
+        setFollowerCount(count);
+      }
+
+      // Cek apakah user sudah mengikuti toko ini
+      const { data: followData, error: followError } = await supabase
+        .from('follower_toko')
+        .select('id')
+        .eq('id_toko', tokoId)
+        .eq('id_users', userId)
+        .maybeSingle();
+
+      if (!followError && followData) {
+        setIsFollowing(true);
+      }
+    } catch (err) {
+      console.error('Gagal memuat status pengikut:', err);
+    }
+  };
+
+  // [FUNGSI TOGGLE FOLLOW / UNFOLLOW]: Menangani aksi ikuti dan berhenti mengikuti toko
+  const handleToggleFollow = async () => {
+    if (!toko || !currentUserId) return;
+    if (toko.user_id === currentUserId) {
+      showToast('Anda tidak dapat mengikuti toko sendiri.', 'error');
+      return;
+    }
+
+    setIsProcessingFollow(true);
+    try {
+      if (isFollowing) {
+        // Unfollow
+        const { error } = await supabase
+          .from('follower_toko')
+          .delete()
+          .eq('id_toko', toko.id)
+          .eq('id_users', currentUserId);
+
+        if (error) throw error;
+
+        setIsFollowing(false);
+        setFollowerCount((prev) => Math.max(0, prev - 1));
+        showToast('Berhenti mengikuti toko.', 'success');
+      } else {
+        // Follow
+        const { error } = await supabase
+          .from('follower_toko')
+          .insert([{ id_toko: toko.id, id_users: currentUserId }]);
+
+        if (error) throw error;
+
+        setIsFollowing(true);
+        setFollowerCount((prev) => prev + 1);
+        showToast('Berhasil mengikuti toko!', 'success');
+      }
+    } catch (err: any) {
+      showToast('Gagal memproses pengikut: ' + err.message, 'error');
+    } finally {
+      setIsProcessingFollow(false);
+    }
   };
 
   // [FUNGSI AMBIL DATA PUBLIK]: Mengambil data informasi toko (termasuk konfigurasi pertanyaan kustom) dan produknya
@@ -152,7 +236,43 @@ export default function PublicStoreDetailPage() {
           </div>
 
           <div className="w-full md:w-2/3 flex flex-col bg-white">
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-2">{toko.nama}</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900">{toko.nama}</h2>
+
+              {/* [TOMBOL IKUTI TOKO]: Tombol Follow/Unfollow & Info Jumlah Pengikut (Disembunyikan jika milik sendiri) */}
+              {currentUserId && toko.user_id !== currentUserId && (
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-gray-500 font-medium">
+                    <strong className="text-gray-900">{followerCount}</strong> Pengikut
+                  </span>
+                  <button
+                    type="button"
+                    disabled={isProcessingFollow}
+                    onClick={handleToggleFollow}
+                    className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-sm flex items-center gap-2 ${
+                      isFollowing
+                        ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
+                        : 'bg-orange-600 text-white hover:bg-orange-700'
+                    }`}
+                  >
+                    {isProcessingFollow ? (
+                      <i className="fa-solid fa-circle-notch fa-spin"></i>
+                    ) : isFollowing ? (
+                      <>
+                        <i className="fa-solid fa-user-check text-green-600"></i>
+                        <span>Mengikuti</span>
+                      </>
+                    ) : (
+                      <>
+                        <i className="fa-solid fa-user-plus"></i>
+                        <span>Ikuti Toko</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+
             <p className="text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6 flex items-center gap-2">
               <i className="fa-regular fa-calendar-days"></i>
               Terdaftar pada {new Date(toko.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
