@@ -67,13 +67,16 @@ export default function PesananMasukPage() {
   const [selectedActionPesanan, setSelectedActionPesanan] = useState<PesananMasuk | null>(null);
   const [isProcessingAction, setIsProcessingAction] = useState<boolean>(false);
 
+  // [PERBAIKAN]: State baru untuk mengontrol Modal Hapus Khusus (ketik HAPUS & hitung mundur 5 detik)
+  const [deleteModalVisible, setDeleteModalVisible] = useState<boolean>(false);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState<string>('');
+  const [deleteCountdown, setDeleteCountdown] = useState<number>(5);
+
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
 
-  // [FUNGSI UTAMA]: Mengambil data pesanan dari server
-  // Logika pembacaan toko (pemilik OR anggota) tetap utuh sesuai arsitektur cerdas Anda
   const fetchPesananMasuk = async () => {
     try {
       setLoading(true);
@@ -137,6 +140,17 @@ export default function PesananMasukPage() {
     setDynamicQuestionKeys(Array.from(keys));
     setQuestionMap(qMap);
   }, [daftarPesanan]);
+
+  // [PERBAIKAN]: Effect untuk menjalankan hitung mundur otomatis saat Delete Modal terbuka
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (deleteModalVisible && deleteCountdown > 0) {
+      timer = setInterval(() => {
+        setDeleteCountdown((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [deleteModalVisible, deleteCountdown]);
 
   const formatRupiah = (angka: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -332,20 +346,50 @@ export default function PesananMasukPage() {
     }
   };
 
-  // [CATATAN]: Fungsi penghapusan/penolakan ini akan 100% bekerja setelah RLS Policy Delete dijalankan di Supabase.
-  const handleTolakPesanan = async () => {
-    if (!selectedActionPesanan) return;
+  // [PERBAIKAN]: Fungsi untuk membuka Modal Delete Khusus
+  const openDeleteModal = () => {
+    setActionModalVisible(false);
+    setDeleteConfirmationText('');
+    setDeleteCountdown(5);
+    setDeleteModalVisible(true);
+  };
+
+  // [PERBAIKAN]: Logika Utama Hapus Pesanan Secara Dinamis
+  const executeDeletePesanan = async () => {
+    if (!selectedActionPesanan || deleteConfirmationText !== 'HAPUS') return;
     setIsProcessingAction(true);
+    
     try {
-      const { error } = await supabase
+      const deletedNomor = selectedActionPesanan.nomor_pesanan;
+      const currentTokoId = selectedActionPesanan.toko_id;
+
+      // 1. Eksekusi hapus pesanan utama
+      const { error: deleteError } = await supabase
         .from('pesanan')
         .delete()
         .eq('id', selectedActionPesanan.id);
 
-      if (error) throw error;
+      if (deleteError) throw deleteError;
+
+      // 2. Ambil semua pesanan lain dari toko yang sama yang nomor_pesanannya lebih besar
+      const { data: toUpdate } = await supabase
+        .from('pesanan')
+        .select('id, nomor_pesanan')
+        .eq('toko_id', currentTokoId)
+        .gt('nomor_pesanan', deletedNomor);
+
+      // 3. Lakukan update perulangan untuk menurunkan nomor antrean
+      if (toUpdate && toUpdate.length > 0) {
+        for (const item of toUpdate) {
+          await supabase
+            .from('pesanan')
+            .update({ nomor_pesanan: item.nomor_pesanan - 1 })
+            .eq('id', item.id);
+        }
+      }
       
-      showToast('Pesanan berhasil ditolak dan dihapus dari sistem', 'success');
-      setActionModalVisible(false);
+      showToast('Pesanan ditolak dan urutan antrean berhasil diperbarui.', 'success');
+      setDeleteModalVisible(false);
       fetchPesananMasuk();
     } catch (err: any) {
       showToast('Gagal menghapus pesanan: ' + err.message, 'error');
@@ -711,7 +755,7 @@ export default function PesananMasukPage() {
         </>
       )}
 
-      {/* Modal Konfirmasi Aksi (Terima / Tolak Pesanan) */}
+      {/* Modal Awal (Pilihan Terima atau Tolak) */}
       {actionModalVisible && selectedActionPesanan && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-200 space-y-5 text-center relative">
@@ -739,10 +783,11 @@ export default function PesananMasukPage() {
                 Terima Pesanan (Update Status)
               </button>
               
+              {/* [PERBAIKAN]: Tombol ini sekarang memanggil openDeleteModal */}
               <button
                 type="button"
                 disabled={isProcessingAction}
-                onClick={handleTolakPesanan}
+                onClick={openDeleteModal}
                 className={`w-full py-2.5 rounded-xl text-white text-xs sm:text-sm font-medium transition-colors shadow-sm flex items-center justify-center gap-2 ${
                   isProcessingAction ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'
                 }`}
@@ -756,6 +801,65 @@ export default function PesananMasukPage() {
                 disabled={isProcessingAction}
                 onClick={() => setActionModalVisible(false)}
                 className="w-full mt-2 py-2 rounded-xl text-gray-600 bg-gray-100 hover:bg-gray-200 text-xs sm:text-sm font-medium transition-colors"
+              >
+                Batal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* [PERBAIKAN]: Modal Konfirmasi Khusus Hapus (Ketik HAPUS + 5 Detik) */}
+      {deleteModalVisible && selectedActionPesanan && (
+        <div className="fixed inset-0 z-[260] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-200 space-y-4 text-center relative">
+            <div className="w-14 h-14 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-2xl">
+              <i className="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            
+            <div>
+              <h3 className="text-lg font-bold text-red-600">Peringatan Penghapusan</h3>
+              <p className="text-xs sm:text-sm text-gray-600 mt-2">
+                Menghapus pesanan ini bersifat permanen. Nomor urut untuk pesanan di bawahnya akan diturunkan secara dinamis.
+              </p>
+              <p className="text-xs font-bold text-gray-800 mt-2 bg-gray-50 py-2 rounded border border-gray-200">
+                Ketik <span className="text-red-600 select-all">HAPUS</span> untuk melanjutkan.
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <input 
+                type="text" 
+                placeholder="Ketik HAPUS di sini..." 
+                value={deleteConfirmationText}
+                onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-bold text-center outline-none focus:ring-2 focus:ring-red-500 uppercase tracking-widest text-red-600"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                disabled={isProcessingAction || deleteCountdown > 0 || deleteConfirmationText !== 'HAPUS'}
+                onClick={executeDeletePesanan}
+                className={`w-full py-2.5 rounded-xl text-white text-xs sm:text-sm font-bold transition-colors shadow-sm flex items-center justify-center gap-2 ${
+                  (isProcessingAction || deleteCountdown > 0 || deleteConfirmationText !== 'HAPUS') ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'
+                }`}
+              >
+                {isProcessingAction ? (
+                  <><i className="fa-solid fa-circle-notch fa-spin"></i> Memproses...</>
+                ) : deleteCountdown > 0 ? (
+                  `Tunggu (${deleteCountdown} detik)`
+                ) : (
+                  <><i className="fa-solid fa-trash-can"></i> Ya, Hapus Permanen</>
+                )}
+              </button>
+
+              <button
+                type="button"
+                disabled={isProcessingAction}
+                onClick={() => setDeleteModalVisible(false)}
+                className="w-full py-2.5 rounded-xl text-gray-600 bg-gray-100 hover:bg-gray-200 text-xs sm:text-sm font-medium transition-colors"
               >
                 Batal
               </button>
