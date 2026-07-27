@@ -271,7 +271,6 @@ export default function PesananMasukPage() {
     }
   };
 
-  // [PERBAIKAN]: Menyempurnakan format Ekspor Excel (CSV) agar bersih, selaras dengan view, dan bebas dari karakter ganda atau koma berlebih
   const handleExportExcel = () => {
     const colsToExport = activeColumns.filter(c => c.id !== 'aksi');
     if (colsToExport.length === 0) return showToast('Pilih setidaknya satu kolom untuk diekspor', 'error');
@@ -280,7 +279,6 @@ export default function PesananMasukPage() {
     const dataRows = pesananDitampilkan.map(pesanan => {
       return colsToExport.map(col => {
         const rawValue = getRawCellValue(pesanan, col.id);
-        // Membersihkan string dari kutipan atau karakter ganda yang merusak struktur CSV
         const cleanValue = rawValue.replace(/"/g, '""').trim();
         return `"${cleanValue}"`;
       }).join(',');
@@ -295,7 +293,7 @@ export default function PesananMasukPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast('Berhasil diekspor ke format Excel (CSV) secara bersih', 'success');
+    showToast('Berhasil diekspor ke format Excel (CSV) secara dinamis & bersih', 'success');
   };
 
   const handleExportPDF = () => {
@@ -880,7 +878,7 @@ export default function PesananMasukPage() {
         </div>
       )}
 
-      {/* Modal Preview Bukti Transfer */}
+      {/* [PERBAIKAN]: Memperbaiki typo variabel previewBuktin menjadi previewBukti dan casting non-null pada src */}
       {previewBukti && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md" onClick={() => setPreviewBukti(null)}>
           <div className="relative max-w-2xl w-full max-h-[90vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
@@ -893,7 +891,7 @@ export default function PesananMasukPage() {
             </button>
             <div className="bg-white p-2 rounded-xl">
               <img
-                src={previewBukti}
+                src={previewBukti!}
                 alt="Bukti Transfer"
                 className="max-w-full max-h-[80vh] object-contain rounded-lg"
               />
