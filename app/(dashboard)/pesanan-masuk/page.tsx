@@ -366,35 +366,20 @@ export default function PesananMasukPage() {
     setDeleteModalVisible(true);
   };
 
+  // [PERBAIKAN]: Menggunakan Postgres Stored Procedure RPC untuk menghapus dan menurunkan nomor urut secara aman dan instan
   const executeDeletePesanan = async () => {
     if (!selectedActionPesanan || deleteConfirmationText !== 'HAPUS') return;
     setIsProcessingAction(true);
     
     try {
-      const deletedNomor = selectedActionPesanan.nomor_pesanan;
-      const currentTokoId = selectedActionPesanan.toko_id;
+      // Memanggil fungsi RPC database Supabase yang menangani hapus dan geser nomor secara bersamaan
+      const { error: rpcError } = await supabase.rpc('hapus_dan_geser_pesanan', {
+        target_pesanan_id: selectedActionPesanan.id,
+        target_toko_id: selectedActionPesanan.toko_id,
+        target_nomor: selectedActionPesanan.nomor_pesanan
+      });
 
-      const { error: deleteError } = await supabase
-        .from('pesanan')
-        .delete()
-        .eq('id', selectedActionPesanan.id);
-
-      if (deleteError) throw deleteError;
-
-      const { data: toUpdate } = await supabase
-        .from('pesanan')
-        .select('id, nomor_pesanan')
-        .eq('toko_id', currentTokoId)
-        .gt('nomor_pesanan', deletedNomor);
-
-      if (toUpdate && toUpdate.length > 0) {
-        for (const item of toUpdate) {
-          await supabase
-            .from('pesanan')
-            .update({ nomor_pesanan: item.nomor_pesanan - 1 })
-            .eq('id', item.id);
-        }
-      }
+      if (rpcError) throw rpcError;
       
       showToast('Pesanan ditolak dan urutan antrean berhasil diperbarui.', 'success');
       setDeleteModalVisible(false);
@@ -405,7 +390,8 @@ export default function PesananMasukPage() {
 
       fetchPesananMasuk();
     } catch (err: any) {
-      showToast('Gagal menghapus pesanan: ' + err.message, 'error');
+      showToast('Gagal menghapus pesanan: ' + (err.message || JSON.stringify(err)), 'error');
+      console.error('Error saat menghapus pesanan:', err);
     } finally {
       setIsProcessingAction(false);
     }
@@ -653,7 +639,6 @@ export default function PesananMasukPage() {
                   </tr>
                 </thead>
                 <tbody className="text-xs text-gray-700">
-                  {/* [PERBAIKAN]: Menggunakan paginatedPesanan pada Map */}
                   {paginatedPesanan.map((pesanan, idx) => (
                     <tr key={pesanan.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-orange-50/50 border-b border-gray-100 transition-colors`}>
                       {activeColumns.map(col => (
@@ -668,7 +653,6 @@ export default function PesananMasukPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
-              {/* [PERBAIKAN]: Menggunakan paginatedPesanan pada Map */}
               {paginatedPesanan.map((pesanan) => (
                 <div key={pesanan.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col sm:flex-row">
                   
@@ -768,7 +752,7 @@ export default function PesananMasukPage() {
             </div>
           )}
 
-          {/* [PERBAIKAN]: Memanggil Komponen Paginator Terpisah */}
+          {/* Memanggil Komponen Paginator Terpisah */}
           <Paginator 
             currentPage={currentPage}
             totalPages={totalPages}
