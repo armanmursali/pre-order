@@ -95,7 +95,13 @@ export default function BerandaPage() {
           .order('created_at', { ascending: false })
           .limit(20);
 
-        setFollowedProducts(prodData || []);
+        if (prodData) {
+         
+          const shuffledProducts = [...prodData].sort(() => 0.5 - Math.random());
+          setFollowedProducts(shuffledProducts);
+        } else {
+          setFollowedProducts([]);
+        }
       } else {
         setFollowedProducts([]);
       }
@@ -529,7 +535,6 @@ export default function BerandaPage() {
               <p className="text-[11px] text-gray-400 mt-1">Yuk, ikuti beberapa toko menarik di atas untuk melihat produk terbaru mereka di sini!</p>
             </div>
           ) : (
-          
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
               {followedProducts.map((prod) => {
                 const isMyStore = prod.toko?.user_id === currentUserId;
