@@ -30,8 +30,9 @@ interface PesananMasuk {
   };
   toko?: {
     nama: string;
+    // [PERBAIKAN]: Menambahkan konfigurasi_pertanyaan untuk menerjemahkan ID ke teks pertanyaan
+    konfigurasi_pertanyaan?: any[];
   };
-  // [PERBAIKAN]: Menambahkan relasi users untuk mendapatkan nama pembeli
   users?: {
     nama: string;
   };
@@ -48,12 +49,14 @@ export default function PesananMasukPage() {
   const [previewBukti, setPreviewBukti] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // [PERBAIKAN]: Menambahkan State untuk View Mode (Card vs Table) dan Konfigurasi Kolom Tabel
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   const [dynamicQuestionKeys, setDynamicQuestionKeys] = useState<string[]>([]);
+  // [PERBAIKAN]: State baru untuk menyimpan pemetaan dari ID pertanyaan ke Teks Pertanyaan asli
+  const [questionMap, setQuestionMap] = useState<Record<string, string>>({});
+  
   const [selectedColumns, setSelectedColumns] = useState<string[]>([
     'nomor_pesanan', 'nama_pembeli', 'produk', 'jumlah', 'total_harga', 'status'
-  ]); // Default kolom yang terceklis
+  ]);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
@@ -85,12 +88,12 @@ export default function PesananMasukPage() {
         const tokoIds = tokoData.map(t => t.id);
 
         // 2. Ambil pesanan yang toko_id nya termasuk dalam daftar toko milik user
-        // [PERBAIKAN]: Menambahkan users(nama) untuk mengambil nama pembeli yang memesan
+        // [PERBAIKAN]: Mengambil konfigurasi_pertanyaan dari toko, dan mengurutkan berdasarkan nomor_pesanan terkecil (ascending: true)
         const { data: pesananData, error: pesananError } = await supabase
           .from('pesanan')
-          .select('*, produk(nama, foto), toko(nama), users(nama)')
+          .select('*, produk(nama, foto), toko(nama, konfigurasi_pertanyaan), users(nama)')
           .in('toko_id', tokoIds)
-          .order('created_at', { ascending: false });
+          .order('nomor_pesanan', { ascending: true });
 
         if (pesananError) throw pesananError;
         setDaftarPesanan(pesananData || []);
@@ -103,20 +106,32 @@ export default function PesananMasukPage() {
     }
   };
 
-  // Jalankan fetch saat komponen pertama kali dimuat
   useEffect(() => {
     fetchPesananMasuk();
   }, []);
 
-  // [PERBAIKAN]: Effect untuk mengekstrak otomatis semua pertanyaan dinamis yang ada di JSON jawaban_pertanyaan
+  // [PERBAIKAN]: Effect untuk mengekstrak kunci pertanyaan dan memetakan ID ke teks pertanyaan aslinya
   useEffect(() => {
     const keys = new Set<string>();
+    const qMap: Record<string, string> = {};
+
     daftarPesanan.forEach(p => {
       if (p.jawaban_pertanyaan) {
-        Object.keys(p.jawaban_pertanyaan).forEach(k => keys.add(k));
+        Object.keys(p.jawaban_pertanyaan).forEach(k => {
+          keys.add(k);
+          
+          // Menerjemahkan ID pertanyaan ke teks pertanyaan dari konfigurasi toko
+          if (p.toko?.konfigurasi_pertanyaan && Array.isArray(p.toko.konfigurasi_pertanyaan)) {
+            const config = p.toko.konfigurasi_pertanyaan.find((item: any) => item.id === k || item.pertanyaan === k);
+            if (config && config.pertanyaan) {
+              qMap[k] = config.pertanyaan;
+            }
+          }
+        });
       }
     });
     setDynamicQuestionKeys(Array.from(keys));
+    setQuestionMap(qMap);
   }, [daftarPesanan]);
 
   const formatRupiah = (angka: number) => {
@@ -143,7 +158,6 @@ export default function PesananMasukPage() {
     ? daftarPesanan 
     : daftarPesanan.filter(p => p.toko_id === selectedTokoId);
 
-  // [PERBAIKAN]: Fungsi Toggle untuk checklist kolom pada mode tabel
   const toggleColumn = (colName: string) => {
     setSelectedColumns(prev => 
       prev.includes(colName) ? prev.filter(c => c !== colName) : [...prev, colName]
@@ -159,7 +173,6 @@ export default function PesananMasukPage() {
     );
   }
 
-  // Daftar kolom statis yang tersedia untuk dipilih
   const staticColumns = [
     { id: 'nomor_pesanan', label: 'No. Pesanan' },
     { id: 'toko', label: 'Toko' },
@@ -190,7 +203,6 @@ export default function PesananMasukPage() {
         </div>
 
         <div className="flex flex-col sm:flex-row items-center gap-3">
-          {/* [PERBAIKAN]: Toggle Switch View Mode (Card vs Table) */}
           <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200">
             <button 
               onClick={() => setViewMode('card')}
@@ -206,7 +218,6 @@ export default function PesananMasukPage() {
             </button>
           </div>
 
-          {/* [DROPDOWN TOKO]: Pemilih filter toko */}
           <div className="w-full sm:w-auto flex items-center gap-2">
             <label htmlFor="filterToko" className="text-xs font-semibold text-gray-600 whitespace-nowrap">
               Filter Toko:
@@ -228,7 +239,7 @@ export default function PesananMasukPage() {
         </div>
       </div>
 
-      {/* [PERBAIKAN]: Kontrol Pilihan Kolom (Hanya muncul jika mode Tabel) */}
+      {/* Kontrol Pilihan Kolom (Hanya muncul jika mode Tabel) */}
       {viewMode === 'table' && daftarPesanan.length > 0 && (
         <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
           <h3 className="text-xs font-bold text-gray-700 mb-3 uppercase tracking-wider border-b border-gray-100 pb-2">
@@ -256,7 +267,8 @@ export default function PesananMasukPage() {
                   checked={selectedColumns.includes(`dyn_${qKey}`)}
                   onChange={() => toggleColumn(`dyn_${qKey}`)}
                 />
-                <span className="select-none font-medium italic">Q: {qKey}</span>
+                {/* [PERBAIKAN]: Menampilkan teks pertanyaan dari hasil pemetaan, bukan sekadar ID */}
+                <span className="select-none font-medium italic">{questionMap[qKey] || qKey}</span>
               </label>
             ))}
           </div>
@@ -288,7 +300,6 @@ export default function PesananMasukPage() {
         </div>
       ) : (
         <>
-          {/* [PERBAIKAN]: Tampilan Mode Tabel Excel-like */}
           {viewMode === 'table' ? (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
               <table className="w-full text-left border-collapse min-w-max">
@@ -306,10 +317,12 @@ export default function PesananMasukPage() {
                     {selectedColumns.includes('status') && <th className="p-3 border-r border-orange-100">Status</th>}
                     {selectedColumns.includes('waktu') && <th className="p-3 border-r border-orange-100">Waktu</th>}
                     
-                    {/* Header Kolom Pertanyaan Dinamis */}
+                    {/* [PERBAIKAN]: Menampilkan teks pertanyaan pada Header Tabel Excel-like */}
                     {dynamicQuestionKeys.map(qKey => 
                       selectedColumns.includes(`dyn_${qKey}`) && (
-                        <th key={`th_${qKey}`} className="p-3 border-r border-orange-100 italic bg-amber-50">Q: {qKey}</th>
+                        <th key={`th_${qKey}`} className="p-3 border-r border-orange-100 italic bg-amber-50">
+                          {questionMap[qKey] || qKey}
+                        </th>
                       )
                     )}
                     <th className="p-3 text-center">Aksi</th>
@@ -369,12 +382,10 @@ export default function PesananMasukPage() {
               </table>
             </div>
           ) : (
-            /* Tampilan Mode Card (Logic Lama Tetap Dipertahankan) */
             <div className="grid grid-cols-1 gap-4">
               {pesananDitampilkan.map((pesanan) => (
                 <div key={pesanan.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col sm:flex-row">
                   
-                  {/* Info Singkat Produk (Kolom Kiri) */}
                   <div className="p-4 bg-gray-50 border-b sm:border-b-0 sm:border-r border-gray-200 w-full sm:w-64 flex-shrink-0 flex items-start gap-4">
                     <div className="w-16 h-16 bg-white border border-gray-200 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0">
                       {pesanan.produk?.foto ? (
@@ -397,31 +408,28 @@ export default function PesananMasukPage() {
                     </div>
                   </div>
 
-                  {/* Detail Pesanan (Kolom Kanan) */}
                   <div className="p-4 flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
                     
-                    {/* Data Pembeli & Pengiriman */}
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 mb-2">
                         <i className="fa-solid fa-address-card text-gray-400"></i>
                         <h4 className="text-xs font-bold text-gray-700 uppercase">Info Pembeli</h4>
                       </div>
                       <div className="text-xs text-gray-600 space-y-1">
-                        {/* [PERBAIKAN]: Menampilkan nama pembeli di card view */}
                         <p><span className="font-semibold text-gray-800">Nama:</span> <span className="font-bold text-amber-900">{pesanan.users?.nama || 'Anonim'}</span></p>
                         <p><span className="font-semibold text-gray-800">Telepon:</span> {pesanan.telepon_pembeli}</p>
                         <p><span className="font-semibold text-gray-800">Alamat:</span> {pesanan.alamat_pembeli}</p>
                         <p><span className="font-semibold text-gray-800">Waktu:</span> {formatDate(pesanan.created_at)}</p>
                       </div>
 
-                      {/* Jawaban Pertanyaan Tambahan (Jika ada) */}
                       {pesanan.jawaban_pertanyaan && Object.keys(pesanan.jawaban_pertanyaan).length > 0 && (
                         <div className="mt-3 p-2 bg-orange-50 border border-orange-100 rounded-lg">
                           <p className="text-[10px] font-bold text-amber-900 uppercase mb-1">Jawaban Kustom:</p>
                           <ul className="text-xs text-gray-700 space-y-0.5 list-disc pl-3">
                             {Object.entries(pesanan.jawaban_pertanyaan).map(([key, value]) => (
                               <li key={key}>
-                                <span className="font-medium">{key}:</span> {String(value)}
+                                {/* [PERBAIKAN]: Menampilkan teks pertanyaan asli di Card View */}
+                                <span className="font-medium">{questionMap[key] || key}:</span> {String(value)}
                               </li>
                             ))}
                           </ul>
@@ -429,7 +437,6 @@ export default function PesananMasukPage() {
                       )}
                     </div>
 
-                    {/* Status, Pembayaran & Aksi */}
                     <div className="space-y-3 flex flex-col justify-between">
                       <div>
                         <div className="flex items-center justify-between mb-1.5">
