@@ -57,18 +57,24 @@ export default function PesananMasukPage() {
   const [dynamicQuestionKeys, setDynamicQuestionKeys] = useState<string[]>([]);
   const [questionMap, setQuestionMap] = useState<Record<string, string>>({});
   
+  // [PERBAIKAN]: Mengganti 'nama_pembeli' menjadi 'email_pembeli'
   const [selectedColumns, setSelectedColumns] = useState<string[]>([
-    'nomor_pesanan', 'nama_pembeli', 'produk', 'jumlah', 'total_harga', 'status', 'aksi'
+    'nomor_pesanan', 'email_pembeli', 'produk', 'jumlah', 'total_harga', 'status', 'aksi'
   ]);
   
   const [draggedCol, setDraggedCol] = useState<string | null>(null);
+
+  // [PERBAIKAN]: State untuk mengontrol Modal Aksi Proses (Terima / Tolak)
+  const [actionModalVisible, setActionModalVisible] = useState<boolean>(false);
+  const [selectedActionPesanan, setSelectedActionPesanan] = useState<PesananMasuk | null>(null);
+  const [isProcessingAction, setIsProcessingAction] = useState<boolean>(false);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
 
-  // [FUNGSI UTAMA]: Mengambil data toko milik pengguna yang login, dan seluruh pesanan yang masuk
+  // [FUNGSI UTAMA]: Mengambil data pesanan dari server
   const fetchPesananMasuk = async () => {
     try {
       setLoading(true);
@@ -152,21 +158,19 @@ export default function PesananMasukPage() {
     }).format(date);
   };
 
-  const getNamaPembeli = (pesanan: PesananMasuk) => {
-    if (pesanan.users) {
-      if (pesanan.users.nama) return pesanan.users.nama;
-      if (pesanan.users.email) return pesanan.users.email;
-    }
-    return `User Tidak Dikenal`;
+  // [PERBAIKAN LOGIC]: Mengambil Email, jika kosong memberikan fallback
+  const getEmailPembeli = (pesanan: PesananMasuk) => {
+    return pesanan.users?.email || 'Email tidak tersedia';
   };
 
+  // [PERBAIKAN PENCARIAN]: Disesuaikan untuk mencari berdasarkan Email
   const pesananDitampilkan = daftarPesanan.filter(p => {
     const isTokoMatch = selectedTokoId === 'semua' || p.toko_id === selectedTokoId;
     
     const query = searchQuery.toLowerCase();
-    const namaPembeli = getNamaPembeli(p).toLowerCase();
+    const emailPembeli = getEmailPembeli(p).toLowerCase();
     const noPesanan = p.nomor_pesanan.toString();
-    const isSearchMatch = query === '' || namaPembeli.includes(query) || noPesanan.includes(query);
+    const isSearchMatch = query === '' || emailPembeli.includes(query) || noPesanan.includes(query);
 
     return isTokoMatch && isSearchMatch;
   });
@@ -174,7 +178,7 @@ export default function PesananMasukPage() {
   const allPossibleCols = [
     { id: 'nomor_pesanan', label: 'No. Pesanan' },
     { id: 'toko', label: 'Toko' },
-    { id: 'nama_pembeli', label: 'Nama Pembeli' },
+    { id: 'email_pembeli', label: 'Email Pembeli' }, // [PERBAIKAN]: Label disesuaikan
     { id: 'telepon', label: 'Telepon' },
     { id: 'alamat', label: 'Alamat' },
     { id: 'produk', label: 'Produk' },
@@ -220,12 +224,12 @@ export default function PesananMasukPage() {
     setDraggedCol(null);
   };
 
-  // [FUNGSI BANTUAN EKSPOR]: Mengambil nilai string mentah (raw text) dari setiap sel
+  // [FUNGSI BANTUAN EKSPOR]
   const getRawCellValue = (pesanan: PesananMasuk, colId: string): string => {
     switch (colId) {
       case 'nomor_pesanan': return String(pesanan.nomor_pesanan);
       case 'toko': return pesanan.toko?.nama || '-';
-      case 'nama_pembeli': return getNamaPembeli(pesanan);
+      case 'email_pembeli': return getEmailPembeli(pesanan);
       case 'telepon': return pesanan.telepon_pembeli || '-';
       case 'alamat': return pesanan.alamat_pembeli || '-';
       case 'produk': return pesanan.produk?.nama || '-';
@@ -234,7 +238,7 @@ export default function PesananMasukPage() {
       case 'metode': return pesanan.metode_pilihan;
       case 'status': return pesanan.status;
       case 'waktu': return formatDate(pesanan.created_at);
-      case 'aksi': return ''; // Aksi tidak ikut diekspor
+      case 'aksi': return ''; 
       default:
         if (colId.startsWith('dyn_')) {
           const qKey = colId.replace('dyn_', '');
@@ -244,26 +248,19 @@ export default function PesananMasukPage() {
     }
   };
 
-  // [FUNGSI EKSPOR]: Ekspor ke Excel (Format CSV agar kompatibel secara murni tanpa library pihak ke-3)
   const handleExportExcel = () => {
     const colsToExport = activeColumns.filter(c => c.id !== 'aksi');
     if (colsToExport.length === 0) return showToast('Pilih setidaknya satu kolom untuk diekspor', 'error');
 
-    // Buat baris header
     const headerRow = colsToExport.map(c => `"${c.label}"`).join(',');
-    
-    // Buat baris data
     const dataRows = pesananDitampilkan.map(pesanan => {
       return colsToExport.map(col => {
         const rawValue = getRawCellValue(pesanan, col.id);
-        // Meloloskan (escape) karakter kutip ganda
         return `"${rawValue.replace(/"/g, '""')}"`;
       }).join(',');
     });
 
     const csvContent = [headerRow, ...dataRows].join('\n');
-    
-    // Memicu unduhan via Blob
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -275,21 +272,16 @@ export default function PesananMasukPage() {
     showToast('Berhasil diekspor ke format Excel (CSV)', 'success');
   };
 
-  // [FUNGSI EKSPOR]: Ekspor ke PDF (Via antarmuka Print Browser asli)
   const handleExportPDF = () => {
     const colsToExport = activeColumns.filter(c => c.id !== 'aksi');
     if (colsToExport.length === 0) return showToast('Pilih setidaknya satu kolom untuk diekspor', 'error');
 
     let html = '<table border="1" style="border-collapse: collapse; width: 100%; font-family: sans-serif; font-size: 12px; text-align: left;">';
-    
-    // Susun Header
     html += '<thead><tr style="background-color: #f3f4f6;">';
     colsToExport.forEach(c => {
       html += `<th style="padding: 8px;">${c.label}</th>`;
     });
     html += '</tr></thead>';
-
-    // Susun Body
     html += '<tbody>';
     pesananDitampilkan.forEach(pesanan => {
       html += '<tr>';
@@ -300,7 +292,6 @@ export default function PesananMasukPage() {
     });
     html += '</tbody></table>';
 
-    // Buka jendela baru untuk memicu Print / Save as PDF
     const printWindow = window.open('', '', 'height=600,width=800');
     if (printWindow) {
       printWindow.document.write('<html><head><title>Cetak / PDF Pesanan</title></head><body style="padding: 20px;">');
@@ -310,7 +301,6 @@ export default function PesananMasukPage() {
       printWindow.document.write('</body></html>');
       printWindow.document.close();
       printWindow.focus();
-      // Jeda sejenak agar konten ter-render sebelum memanggil print dialog
       setTimeout(() => {
         printWindow.print();
         printWindow.close();
@@ -320,14 +310,66 @@ export default function PesananMasukPage() {
     }
   };
 
+  // [PERBAIKAN]: Fungsi untuk membuka modal aksi proses pesanan
+  const handleOpenActionModal = (pesanan: PesananMasuk) => {
+    setSelectedActionPesanan(pesanan);
+    setActionModalVisible(true);
+  };
+
+  // [PERBAIKAN]: Fungsi untuk menerima pesanan (Update Status ke 'Sudah Diterima')
+  const handleTerimaPesanan = async () => {
+    if (!selectedActionPesanan) return;
+    setIsProcessingAction(true);
+    try {
+      const { error } = await supabase
+        .from('pesanan')
+        .update({ status: 'Sudah Diterima' })
+        .eq('id', selectedActionPesanan.id);
+
+      if (error) throw error;
+      
+      showToast('Pesanan berhasil diterima dan status diperbarui', 'success');
+      setActionModalVisible(false);
+      // Memuat ulang data agar tabel / card ter-update secara realtime
+      fetchPesananMasuk(); 
+    } catch (err: any) {
+      showToast('Gagal memperbarui status: ' + err.message, 'error');
+    } finally {
+      setIsProcessingAction(false);
+    }
+  };
+
+  // [PERBAIKAN]: Fungsi untuk menolak pesanan (Hapus dari tabel 'pesanan')
+  const handleTolakPesanan = async () => {
+    if (!selectedActionPesanan) return;
+    setIsProcessingAction(true);
+    try {
+      const { error } = await supabase
+        .from('pesanan')
+        .delete()
+        .eq('id', selectedActionPesanan.id);
+
+      if (error) throw error;
+      
+      showToast('Pesanan berhasil ditolak dan dihapus dari sistem', 'success');
+      setActionModalVisible(false);
+      // Memuat ulang data
+      fetchPesananMasuk();
+    } catch (err: any) {
+      showToast('Gagal menghapus pesanan: ' + err.message, 'error');
+    } finally {
+      setIsProcessingAction(false);
+    }
+  };
+
   const renderTableCell = (pesanan: PesananMasuk, colId: string) => {
     switch (colId) {
       case 'nomor_pesanan':
         return <span className="font-bold">{pesanan.nomor_pesanan}</span>;
       case 'toko':
         return <span className="font-semibold text-orange-700">{pesanan.toko?.nama}</span>;
-      case 'nama_pembeli':
-        return <span className="font-bold">{getNamaPembeli(pesanan)}</span>;
+      case 'email_pembeli':
+        return <span className="font-bold text-gray-800">{getEmailPembeli(pesanan)}</span>; // [PERBAIKAN]: Render email
       case 'telepon':
         return pesanan.telepon_pembeli;
       case 'alamat':
@@ -346,7 +388,7 @@ export default function PesananMasukPage() {
         );
       case 'status':
         return (
-          <span className="px-2 py-0.5 rounded font-semibold bg-gray-200 text-gray-700 border border-gray-300">
+          <span className={`px-2 py-0.5 rounded font-semibold border ${pesanan.status === 'Sudah Diterima' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-100 text-gray-600 border-gray-300'}`}>
             {pesanan.status}
           </span>
         );
@@ -360,7 +402,8 @@ export default function PesananMasukPage() {
                 <i className="fa-solid fa-image"></i>
               </button>
             )}
-            <button onClick={() => showToast('Fitur update status akan datang', 'success')} className="bg-amber-800 hover:bg-amber-900 text-white px-2 py-1 rounded text-xs font-bold transition-colors">
+            {/* [PERBAIKAN]: Membuka Modal Aksi saat diklik */}
+            <button onClick={() => handleOpenActionModal(pesanan)} className="bg-amber-800 hover:bg-amber-900 text-white px-2 py-1 rounded text-xs font-bold transition-colors shadow-sm">
               <i className="fa-solid fa-pen"></i> Proses
             </button>
           </div>
@@ -368,7 +411,6 @@ export default function PesananMasukPage() {
       default:
         if (colId.startsWith('dyn_')) {
           const qKey = colId.replace('dyn_', '');
-          // [PERBAIKAN]: Menghilangkan gaya huruf miring (italic)
           return <span>{pesanan.jawaban_pertanyaan?.[qKey] ? String(pesanan.jawaban_pertanyaan[qKey]) : '-'}</span>;
         }
         return '-';
@@ -387,7 +429,6 @@ export default function PesananMasukPage() {
   return (
     <div className="space-y-6 relative p-0.5 sm:p-6 bg-transparent text-gray-900 min-h-screen">
       
-      {/* Kumpulan Header & Filter (Sekarang dipisah menjadi dua kotak agar rapi dan responsif) */}
       <div className="space-y-4">
         
         {/* Kotak 1: Judul, Toggle View Mode, & Dropdown Toko */}
@@ -439,7 +480,7 @@ export default function PesananMasukPage() {
           </div>
         </div>
 
-        {/* Kotak 2: Container Pencarian Tersendiri (Rapih & Responsif) */}
+        {/* Kotak 2: Container Pencarian Tersendiri */}
         <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
           <div className="relative w-full">
             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -447,7 +488,7 @@ export default function PesananMasukPage() {
             </div>
             <input
               type="text"
-              placeholder="Cari pesanan berdasarkan nama pembeli atau nomor pesanan..."
+              placeholder="Cari pesanan berdasarkan email pembeli atau nomor pesanan..." // [PERBAIKAN]: Text Placeholder diubah
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm bg-gray-50 text-gray-900 outline-none focus:bg-white focus:ring-2 focus:ring-orange-500 transition-all shadow-sm"
@@ -466,7 +507,6 @@ export default function PesananMasukPage() {
               <i className="fa-solid fa-arrows-up-down-left-right mr-1.5"></i> Urutan Kolom Aktif (Geser untuk mengatur)
             </h3>
             
-            {/* [PERBAIKAN]: Tombol Aksi Ekspor (PDF & Excel) */}
             <div className="flex gap-2 w-full sm:w-auto">
               <button 
                 onClick={handleExportExcel}
@@ -515,7 +555,6 @@ export default function PesananMasukPage() {
                     className="flex items-center gap-1.5 text-xs text-gray-600 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-gray-100 hover:text-gray-900 transition-colors"
                   >
                     <i className="fa-solid fa-plus text-gray-400"></i>
-                    {/* [PERBAIKAN]: Menghilangkan gaya miring (italic) pada label tambahan */}
                     <span className="font-medium select-none">{col.label}</span>
                   </button>
                 ))}
@@ -545,7 +584,7 @@ export default function PesananMasukPage() {
           <h2 className="text-lg font-bold text-gray-800 mb-1">Tidak Ditemukan</h2>
           <p className="text-xs sm:text-sm text-gray-500">
             {searchQuery 
-              ? `Tidak ada pesanan dengan nama atau nomor yang cocok dengan "${searchQuery}".` 
+              ? `Tidak ada pesanan dengan email atau nomor yang cocok dengan "${searchQuery}".` 
               : selectedTokoId === 'semua'
                 ? "Belum ada pesanan yang masuk ke toko-toko Anda."
                 : "Belum ada pesanan yang masuk ke toko ini."}
@@ -613,7 +652,8 @@ export default function PesananMasukPage() {
                         <h4 className="text-xs font-bold text-gray-700 uppercase">Info Pembeli</h4>
                       </div>
                       <div className="text-xs text-gray-600 space-y-1">
-                        <p><span className="font-semibold text-gray-800">Nama:</span> <span className="font-bold text-amber-900">{getNamaPembeli(pesanan)}</span></p>
+                        {/* [PERBAIKAN]: Menampilkan Email di tampilan Card */}
+                        <p><span className="font-semibold text-gray-800">Email:</span> <span className="font-bold text-amber-900">{getEmailPembeli(pesanan)}</span></p>
                         <p><span className="font-semibold text-gray-800">Telepon:</span> {pesanan.telepon_pembeli}</p>
                         <p><span className="font-semibold text-gray-800">Alamat:</span> {pesanan.alamat_pembeli}</p>
                         <p><span className="font-semibold text-gray-800">Waktu:</span> {formatDate(pesanan.created_at)}</p>
@@ -649,7 +689,7 @@ export default function PesananMasukPage() {
 
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold text-gray-700 uppercase">Status</span>
-                          <span className="text-xs px-2 py-0.5 rounded font-semibold bg-gray-100 text-gray-600 border border-gray-200">
+                          <span className={`text-xs px-2 py-0.5 rounded font-semibold border ${pesanan.status === 'Sudah Diterima' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-100 text-gray-600 border-gray-300'}`}>
                             {pesanan.status}
                           </span>
                         </div>
@@ -664,9 +704,10 @@ export default function PesananMasukPage() {
                             <i className="fa-solid fa-image"></i> Cek Bukti
                           </button>
                         )}
+                        {/* [PERBAIKAN]: Membuka Modal Aksi */}
                         <button
                           className="flex-1 bg-amber-800 hover:bg-amber-900 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-sm flex items-center justify-center gap-1.5"
-                          onClick={() => showToast('Fitur update status akan datang', 'success')}
+                          onClick={() => handleOpenActionModal(pesanan)}
                         >
                           <i className="fa-solid fa-pen-to-square"></i> Proses
                         </button>
@@ -679,6 +720,59 @@ export default function PesananMasukPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* [PERBAIKAN]: Modal Konfirmasi Aksi (Terima / Tolak Pesanan) */}
+      {actionModalVisible && selectedActionPesanan && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-200 space-y-5 text-center relative">
+            <div className="w-14 h-14 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mx-auto text-2xl">
+              <i className="fa-solid fa-clipboard-check"></i>
+            </div>
+            
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Proses Pesanan No. {selectedActionPesanan.nomor_pesanan}</h3>
+              <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                Pilih aksi yang ingin Anda lakukan untuk pesanan dari <strong className="text-gray-800">{getEmailPembeli(selectedActionPesanan)}</strong>.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3 pt-2">
+              <button
+                type="button"
+                disabled={isProcessingAction}
+                onClick={handleTerimaPesanan}
+                className={`w-full py-2.5 rounded-xl text-white text-xs sm:text-sm font-medium transition-colors shadow-sm flex items-center justify-center gap-2 ${
+                  isProcessingAction ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
+                }`}
+              >
+                {isProcessingAction ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-check"></i>}
+                Terima Pesanan (Update Status)
+              </button>
+              
+              <button
+                type="button"
+                disabled={isProcessingAction}
+                onClick={handleTolakPesanan}
+                className={`w-full py-2.5 rounded-xl text-white text-xs sm:text-sm font-medium transition-colors shadow-sm flex items-center justify-center gap-2 ${
+                  isProcessingAction ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'
+                }`}
+              >
+                {isProcessingAction ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-trash"></i>}
+                Tolak & Hapus Pesanan
+              </button>
+
+              <button
+                type="button"
+                disabled={isProcessingAction}
+                onClick={() => setActionModalVisible(false)}
+                className="w-full mt-2 py-2 rounded-xl text-gray-600 bg-gray-100 hover:bg-gray-200 text-xs sm:text-sm font-medium transition-colors"
+              >
+                Batal
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modal Preview Bukti Transfer */}
