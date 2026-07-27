@@ -17,6 +17,7 @@ interface TokoDetail {
   alamat?: string | null;
   rekening?: string | null;
   metode_pembayaran?: string | null;
+  konfigurasi_pertanyaan?: any[]; // [PENYESUAIAN PERTANYAAN KUSTOM]: Menampung konfigurasi pertanyaan kustom dari toko
   kategori_toko?: {
     nama: string;
   };
@@ -63,12 +64,12 @@ export default function PublicStoreDetailPage() {
     }).format(angka);
   };
 
-  // [FUNGSI AMBIL DATA PUBLIK]: Mengambil data informasi toko milik orang lain dan produknya
+  // [FUNGSI AMBIL DATA PUBLIK]: Mengambil data informasi toko (termasuk konfigurasi pertanyaan kustom) dan produknya
   const fetchPublicStoreData = async (tokoId: string) => {
     try {
       setLoading(true);
 
-      // 1. Ambil informasi detail toko
+      // 1. Ambil informasi detail toko beserta konfigurasi_pertanyaan
       const { data: dataToko, error: errorToko } = await supabase
         .from('toko')
         .select('*, kategori_toko(nama)')

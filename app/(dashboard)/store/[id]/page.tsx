@@ -18,6 +18,7 @@ interface TokoDetail {
   alamat?: string | null;
   rekening?: string | null;
   metode_pembayaran?: string | null;
+  konfigurasi_pertanyaan?: any[];
   anggota?: any[]; 
   kategori_toko?: {
     nama: string;
@@ -66,13 +67,14 @@ export default function StoreDetailPage() {
   const [productToDelete, setProductToDelete] = useState<Produk | null>(null);
   const [deleteInputName, setDeleteInputName] = useState<string>('');
 
-  // State Modal Pengaturan Informasi Toko
+  // State Modal Pengaturan Informasi Toko & Konfigurasi Pertanyaan Kustom
   const [isStoreSettingsModalOpen, setIsStoreSettingsModalOpen] = useState<boolean>(false);
   const [storeSettingsForm, setStoreSettingsForm] = useState({
     telepon: '',
     alamat: '',
     rekening: '',
     metode_pembayaran: 'Tunai & Transfer',
+    konfigurasi_pertanyaan: [] as any[],
   });
 
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
@@ -201,12 +203,13 @@ export default function StoreDetailPage() {
 
       setToko({ ...dataToko, anggota: listAnggota });
 
-      // Sinkronisasi data ke state form pengaturan toko
+      // Sinkronisasi data ke state form pengaturan toko termasuk pertanyaan kustom
       setStoreSettingsForm({
         telepon: dataToko.telepon || '',
         alamat: dataToko.alamat || '',
         rekening: dataToko.rekening || '',
         metode_pembayaran: dataToko.metode_pembayaran || 'Tunai & Transfer',
+        konfigurasi_pertanyaan: Array.isArray(dataToko.konfigurasi_pertanyaan) ? dataToko.konfigurasi_pertanyaan : [],
       });
 
       const { data: dataJenis } = await supabase
@@ -231,7 +234,7 @@ export default function StoreDetailPage() {
     }
   };
 
-  // [FUNGSI KELOLA INFORMASI TOKO]: Menyimpan perubahan telepon, alamat, rekening, dan metode pembayaran
+  // [FUNGSI KELOLA INFORMASI TOKO & PERTANYAAN KUSTOM]: Menyimpan perubahan informasi dan konfigurasi pertanyaan
   const handleStoreSettingsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!toko) return;
@@ -245,13 +248,14 @@ export default function StoreDetailPage() {
           alamat: storeSettingsForm.alamat,
           rekening: storeSettingsForm.rekening,
           metode_pembayaran: storeSettingsForm.metode_pembayaran,
+          konfigurasi_pertanyaan: storeSettingsForm.konfigurasi_pertanyaan,
           updated_at: new Date().toISOString(),
         })
         .eq('id', toko.id);
 
       if (error) throw error;
 
-      showToast('Informasi detail toko berhasil diperbarui!', 'success');
+      showToast('Informasi detail & pertanyaan kustom toko berhasil diperbarui!', 'success');
       setIsStoreSettingsModalOpen(false);
       fetchAllData(toko.id);
     } catch (error: any) {
@@ -259,6 +263,68 @@ export default function StoreDetailPage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // [FUNGSI TAMBAH PERTANYAAN KUSTOM]: Menambah item pertanyaan baru ke form pengaturan
+  const handleAddPertanyaan = () => {
+    const newItem = {
+      id: Date.now().toString(),
+      pertanyaan: '',
+      tipe: 'teks', // 'teks' atau 'radio'
+      opsi: [''], // untuk radio button
+    };
+    setStoreSettingsForm(prev => ({
+      ...prev,
+      konfigurasi_pertanyaan: [...prev.konfigurasi_pertanyaan, newItem],
+    }));
+  };
+
+  // [FUNGSI HAPUS PERTANYAAN KUSTOM]: Menghapus item pertanyaan berdasarkan index
+  const handleRemovePertanyaan = (index: number) => {
+    setStoreSettingsForm(prev => {
+      const updated = [...prev.konfigurasi_pertanyaan];
+      updated.splice(index, 1);
+      return { ...prev, konfigurasi_pertanyaan: updated };
+    });
+  };
+
+  // [FUNGSI UBAH PERTANYAAN KUSTOM]: Mengubah teks atau tipe pertanyaan
+  const handlePertanyaanChange = (index: number, field: string, value: any) => {
+    setStoreSettingsForm(prev => {
+      const updated = [...prev.konfigurasi_pertanyaan];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, konfigurasi_pertanyaan: updated };
+    });
+  };
+
+  // [FUNGSI KELOLA OPSI RADIO]: Menambah atau mengubah opsi pilihan ganda
+  const handleOpsiChange = (pIndex: number, oIndex: number, value: string) => {
+    setStoreSettingsForm(prev => {
+      const updated = [...prev.konfigurasi_pertanyaan];
+      const opsiList = [...(updated[pIndex].opsi || [])];
+      opsiList[oIndex] = value;
+      updated[pIndex] = { ...updated[pIndex], opsi: opsiList };
+      return { ...prev, konfigurasi_pertanyaan: updated };
+    });
+  };
+
+  const handleAddOpsi = (pIndex: number) => {
+    setStoreSettingsForm(prev => {
+      const updated = [...prev.konfigurasi_pertanyaan];
+      const opsiList = [...(updated[pIndex].opsi || []), ''];
+      updated[pIndex] = { ...updated[pIndex], opsi: opsiList };
+      return { ...prev, konfigurasi_pertanyaan: updated };
+    });
+  };
+
+  const handleRemoveOpsi = (pIndex: number, oIndex: number) => {
+    setStoreSettingsForm(prev => {
+      const updated = [...prev.konfigurasi_pertanyaan];
+      const opsiList = [...(updated[pIndex].opsi || [])];
+      opsiList.splice(oIndex, 1);
+      updated[pIndex] = { ...updated[pIndex], opsi: opsiList };
+      return { ...prev, konfigurasi_pertanyaan: updated };
+    });
   };
 
   // [LOGIKA STATUS ANGGOTA + TOLAK]: Menerima, menolak, ubah jadi pemilik, atau keluar/keluarkan
@@ -894,19 +960,19 @@ export default function StoreDetailPage() {
         </div>
       )}
 
-      {/* [MODAL PENGATURAN TOKO]: Form untuk mengatur nomor telepon, alamat, rekening, dan metode pembayaran */}
+      {/* [MODAL PENGATURAN TOKO]: Form untuk mengatur telepon, alamat, rekening, metode pembayaran, & pertanyaan kustom */}
       {isStoreSettingsModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-3 sm:p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="flex justify-between items-center px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-200">
-              <h2 className="text-base sm:text-lg font-bold text-amber-900">Pengaturan Informasi Toko</h2>
+              <h2 className="text-base sm:text-lg font-bold text-amber-900">Pengaturan Informasi Toko & Pertanyaan Pesanan</h2>
               <button onClick={() => setIsStoreSettingsModalOpen(false)} className="text-gray-400 hover:text-red-500 transition-colors">
                 <i className="fa-solid fa-xmark text-lg sm:text-xl"></i>
               </button>
             </div>
             
-            <div className="overflow-y-auto">
-              <form onSubmit={handleStoreSettingsSubmit} className="p-4 sm:p-6 space-y-3 sm:space-y-4">
+            <div className="overflow-y-auto p-4 sm:p-6 space-y-4">
+              <form onSubmit={handleStoreSettingsSubmit} className="space-y-4">
                 <div>
                   <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1">Nomor Telepon / WhatsApp</label>
                   <input
@@ -951,6 +1017,93 @@ export default function StoreDetailPage() {
                     className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none text-xs sm:text-sm transition-all resize-none text-gray-900 bg-white font-mono"
                     placeholder="Contoh: BCA 1234567890 a.n Nama Pemilik"
                   ></textarea>
+                </div>
+
+                {/* [KONFIGURASI PERTANYAAN KUSTOM PEMBELI] */}
+                <div className="border-t border-gray-200 pt-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold text-amber-900">Pertanyaan Kustom untuk Pembeli</h3>
+                      <p className="text-[11px] text-gray-500">Tambah pertanyaan tambahan yang wajib diisi pembeli saat checkout.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddPertanyaan}
+                      className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-sm flex items-center gap-1.5"
+                    >
+                      <i className="fa-solid fa-plus"></i> Tambah Pertanyaan
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {storeSettingsForm.konfigurasi_pertanyaan.map((item: any, pIndex: number) => (
+                      <div key={item.id || pIndex} className="p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-2 relative">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800">Pertanyaan #{pIndex + 1}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePertanyaan(pIndex)}
+                            className="text-red-500 hover:text-red-700 text-xs font-medium"
+                          >
+                            <i className="fa-solid fa-trash"></i> Hapus
+                          </button>
+                        </div>
+
+                        <input
+                          type="text"
+                          value={item.pertanyaan}
+                          onChange={(e) => handlePertanyaanChange(pIndex, 'pertanyaan', e.target.value)}
+                          placeholder="Tuliskan pertanyaan (misal: Warna yang diinginkan?)"
+                          className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs text-gray-900 bg-white outline-none focus:ring-2 focus:ring-orange-500"
+                          required
+                        />
+
+                        <div className="flex items-center gap-3">
+                          <label className="text-xs font-semibold text-gray-700">Tipe Jawaban:</label>
+                          <select
+                            value={item.tipe}
+                            onChange={(e) => handlePertanyaanChange(pIndex, 'tipe', e.target.value)}
+                            className="px-2 py-1 border border-gray-300 rounded-lg text-xs text-gray-900 bg-white outline-none"
+                          >
+                            <option value="teks">Teks Singkat</option>
+                            <option value="radio">Pilihan Ganda (Radio)</option>
+                          </select>
+                        </div>
+
+                        {item.tipe === 'radio' && (
+                          <div className="pl-3 border-l-2 border-orange-300 space-y-2 mt-2">
+                            <label className="block text-[11px] font-semibold text-gray-600">Opsi Pilihan:</label>
+                            {(item.opsi || []).map((opsiVal: string, oIndex: number) => (
+                              <div key={oIndex} className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  value={opsiVal}
+                                  onChange={(e) => handleOpsiChange(pIndex, oIndex, e.target.value)}
+                                  placeholder={`Opsi ${oIndex + 1}`}
+                                  className="w-full px-2.5 py-1 border border-gray-300 rounded-md text-xs text-gray-900 bg-white outline-none"
+                                  required
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveOpsi(pIndex, oIndex)}
+                                  className="text-gray-400 hover:text-red-500 text-xs"
+                                >
+                                  <i className="fa-solid fa-xmark"></i>
+                                </button>
+                              </div>
+                            ))}
+                            <button
+                              type="button"
+                              onClick={() => handleAddOpsi(pIndex)}
+                              className="text-xs font-semibold text-orange-600 hover:text-orange-700 mt-1 flex items-center gap-1"
+                            >
+                              <i className="fa-solid fa-plus"></i> Tambah Opsi
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="pt-3 sm:pt-4 flex justify-end gap-2 sm:gap-3 border-t border-gray-100">
