@@ -198,7 +198,7 @@ export default function PublicProductDetailPage() {
 
       const totalHarga = produk.harga * jumlah;
 
-      // [INSERT DATA KE DATABASE]: Mengirim data transaksi (error RLS tidak akan muncul lagi setelah SQL Policy dijalankan)
+      // [INSERT DATA KE DATABASE]: Mengirim data transaksi tanpa perlu menyertakan nomor_pesanan secara manual
       const { error: insertError } = await supabase
         .from('pesanan')
         .insert({
