@@ -161,7 +161,7 @@ export default function PublicProductDetailPage() {
     setShowConfirmModal(true);
   };
 
-  // [FUNGSI PROSES PEMESANAN / TRANSAKSI DENGAN PANGGILAN RPC SUPABASE]: Menjamin nomor pesanan unik, berurutan, dan tidak pernah sama
+  // [FUNGSI PROSES PEMESANAN / TRANSAKSI DENGAN PANGGILAN RPC ATOMIK]: Mengambil nomor pesanan secara aman langsung dari database tanpa bentrok
   const executeCheckout = async () => {
     if (!produk || isSubmitting) return;
 
@@ -196,16 +196,16 @@ export default function PublicProductDetailPage() {
         buktiUrl = publicUrlData.publicUrl;
       }
 
-      // [PANGGILAN RPC KE SUPABASE]: Meminta nomor urut pesanan terbaru yang dijamin aman dan akurat per toko
-      const { data: nomorUrut, error: rpcError } = await supabase
-        .rpc('generate_nomor_pesanan', { p_toko_id: produk.toko_id });
+      // [PANGGILAN RPC SUPABASE]: Mendapatkan nomor urut pesanan yang dihitung secara presisi di dalam database
+      const { data: nextNomorPesanan, error: rpcError } = await supabase
+        .rpc('get_next_order_number', { target_toko_id: produk.toko_id });
 
       if (rpcError) throw rpcError;
 
-      const nextNomorPesanan = nomorUrut !== null && nomorUrut !== undefined ? Number(nomorUrut) : 1;
+      const finalNomorPesanan = nextNomorPesanan !== null && nextNomorPesanan !== undefined ? Number(nextNomorPesanan) : 1;
       const totalHarga = produk.harga * jumlah;
 
-      // [INSERT DATA KE DATABASE]: Menyertakan nomor_pesanan hasil RPC secara eksplisit
+      // [INSERT DATA KE DATABASE]: Menyimpan data transaksi beserta nomor pesanan yang unik
       const { error: insertError } = await supabase
         .from('pesanan')
         .insert({
@@ -219,7 +219,7 @@ export default function PublicProductDetailPage() {
           alamat_pembeli: alamatPembeli,
           telepon_pembeli: teleponPembeli,
           jawaban_pertanyaan: jawabanPertanyaan,
-          nomor_pesanan: nextNomorPesanan,
+          nomor_pesanan: finalNomorPesanan,
           status: 'Belum Diterima',
         });
 
