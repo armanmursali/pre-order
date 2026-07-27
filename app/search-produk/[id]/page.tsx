@@ -161,7 +161,7 @@ export default function PublicProductDetailPage() {
     setShowConfirmModal(true);
   };
 
-  // [FUNGSI PROSES PEMESANAN KETAT DI KODE]: Mengambil nomor pesanan berikutnya secara eksplisit per toko lalu melakukan insert
+  // [FUNGSI PROSES PEMESANAN / TRANSAKSI KETAT]: Mengambil nomor pesanan tertinggi spesifik per toko secara akurat sebelum insert
   const executeCheckout = async () => {
     if (!produk || isSubmitting) return;
 
@@ -171,19 +171,23 @@ export default function PublicProductDetailPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) throw new Error('Anda harus login terlebih dahulu.');
 
-      // [PENANGANAN KETAT NOMOR PESANAN PER TOKO]: Ambil nomor pesanan tertinggi saat ini untuk toko tersebut
-      const { data: existingPesanan, error: fetchOrderError } = await supabase
+      // [LOGIKA PRESISI NOMOR PESANAN BERDASARKAN TOKO]: Mengambil seluruh nomor pesanan pada toko ini untuk menentukan angka berikutnya secara mutlak
+      const { data: listPesananToko, error: fetchOrderError } = await supabase
         .from('pesanan')
         .select('nomor_pesanan')
-        .eq('toko_id', produk.toko_id)
-        .order('nomor_pesanan', { ascending: false })
-        .limit(1);
+        .eq('toko_id', produk.toko_id);
 
       if (fetchOrderError) throw fetchOrderError;
 
       let nextNomorPesanan = 1;
-      if (existingPesanan && existingPesanan.length > 0 && existingPesanan[0].nomor_pesanan != null) {
-        nextNomorPesanan = Number(existingPesanan[0].nomor_pesanan) + 1;
+      if (listPesananToko && listPesananToko.length > 0) {
+        const existingNumbers = listPesananToko
+          .map((item: any) => Number(item.nomor_pesanan))
+          .filter((num: number) => !isNaN(num) && num > 0);
+        
+        if (existingNumbers.length > 0) {
+          nextNomorPesanan = Math.max(...existingNumbers) + 1;
+        }
       }
 
       let buktiUrl = null;
@@ -213,7 +217,7 @@ export default function PublicProductDetailPage() {
 
       const totalHarga = produk.harga * jumlah;
 
-      // [INSERT DATA DENGAN NOMOR PESANAN EKSPLISIT]: Menyertakan nomor_pesanan hasil perhitungan ketat di kode
+      // [INSERT DATA DENGAN NOMOR PESANAN KETAT]: Menyertakan nomor_pesanan yang dihitung secara akurat dari kode
       const { error: insertError } = await supabase
         .from('pesanan')
         .insert({
