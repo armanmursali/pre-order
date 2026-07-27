@@ -50,6 +50,7 @@ export default function PesananPage() {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(25);
 
+  // [FUNGSI FETCH]: Mengambil data pesanan milik user yang sedang login
   const fetchUserPesanan = async () => {
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -134,7 +135,7 @@ export default function PesananPage() {
     setDeleteModalVisible(true);
   };
 
-  // [PERBAIKAN]: Logika Utama Batalkan Pesanan oleh Pembeli + Penurunan Nomor Antrean Dinamis Secara Menyeluruh di Toko Terkait
+  // [FUNGSI UTAMA HAPUS & UPDATE ANTREAN]: Menghapus pesanan dan menurunkan nomor antrean pesanan di bawahnya secara dinamis
   const executeDeletePesanan = async () => {
     if (!selectedDeletePesanan || deleteConfirmationText !== 'HAPUS') return;
     setIsProcessingAction(true);
@@ -145,7 +146,7 @@ export default function PesananPage() {
 
       if (!currentTokoId) throw new Error("ID Toko tidak terdeteksi pada pesanan ini.");
 
-      // 1. Eksekusi hapus pesanan milik pembeli di database
+      // 1. Eksekusi hapus pesanan utama milik pembeli
       const { error: deleteError } = await supabase
         .from('pesanan')
         .delete()
@@ -153,7 +154,7 @@ export default function PesananPage() {
 
       if (deleteError) throw deleteError;
 
-      // 2. Ambil semua pesanan lain di toko yang sama yang nomor_pesanannya lebih besar dari yang dihapus
+      // 2. Ambil semua pesanan lain di toko yang sama yang nomor_pesanannya lebih besar
       const { data: toUpdate, error: fetchError } = await supabase
         .from('pesanan')
         .select('id, nomor_pesanan')
@@ -162,7 +163,7 @@ export default function PesananPage() {
 
       if (fetchError) throw fetchError;
 
-      // 3. Lakukan perulangan update untuk menurunkan nomor pesanan di bawahnya sebanyak 1 angka secara dinamis
+      // 3. Lakukan perulangan update untuk menurunkan nomor pesanan milik orang lain sebanyak 1 angka
       if (toUpdate && toUpdate.length > 0) {
         for (const item of toUpdate) {
           const { error: updateError } = await supabase
@@ -209,6 +210,7 @@ export default function PesananPage() {
 
   return (
     <div className="space-y-6 bg-white text-gray-900 min-h-screen p-0.5 sm:p-6">
+      {/* Header Halaman Pesanan */}
       <div className="rounded-xl bg-white p-6 shadow-sm border border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-amber-900 mb-1">
@@ -227,6 +229,7 @@ export default function PesananPage() {
         </Link>
       </div>
 
+      {/* Daftar Pesanan */}
       {pesananList.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl border border-gray-200 text-gray-500 shadow-sm">
           <i className="fa-solid fa-receipt text-4xl mb-3 text-gray-300 block"></i>
@@ -247,6 +250,7 @@ export default function PesananPage() {
                 key={item.id} 
                 className="bg-white border border-gray-200 rounded-xl shadow-sm hover:border-orange-200 transition-all p-4 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6"
               >
+                {/* Bagian Kiri: Info Produk & Toko */}
                 <div className="flex items-start gap-4 flex-grow w-full md:w-auto">
                   <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center border border-gray-200 cursor-pointer" onClick={() => item.produk?.foto && setPreviewImageUrl(item.produk.foto)}>
                     {item.produk?.foto ? (
@@ -280,6 +284,7 @@ export default function PesananPage() {
                   </div>
                 </div>
 
+                {/* Bagian Kanan: Status, Bukti Transfer, & Tombol Hapus */}
                 <div className="flex flex-col sm:flex-row md:flex-col items-end justify-between w-full md:w-auto gap-3 border-t md:border-t-0 pt-3 md:pt-0 border-gray-100">
                   
                   <div className="flex flex-col items-end gap-2 w-full">
@@ -338,6 +343,7 @@ export default function PesananPage() {
         </>
       )}
 
+      {/* Modal Konfirmasi Hapus */}
       {deleteModalVisible && selectedDeletePesanan && (
         <div className="fixed inset-0 z-[260] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-200 space-y-4 text-center relative">
@@ -396,6 +402,7 @@ export default function PesananPage() {
         </div>
       )}
 
+      {/* Modal Preview Gambar */}
       {previewImageUrl && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md" onClick={() => setPreviewImageUrl(null)}>
           <div className="relative max-w-4xl w-full max-h-[90vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
@@ -415,6 +422,7 @@ export default function PesananPage() {
         </div>
       )}
 
+      {/* Komponen Toast */}
       {toast && (
         <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[200] transition-all duration-300 ease-in-out">
           <div className={`flex items-center gap-2.5 sm:gap-3 px-4 sm:px-5 py-3 sm:py-3.5 rounded-xl shadow-xl text-white font-medium ${
