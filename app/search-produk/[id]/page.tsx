@@ -24,7 +24,7 @@ interface ProdukDetail {
     alamat?: string | null;
     rekening?: string | null;
     metode_pembayaran?: string | null;
-    konfigurasi_pertanyaan?: any[]; // [PENYESUAIAN PERTANYAAN KUSTOM]: Menampung daftar pertanyaan dari toko
+    konfigurasi_pertanyaan?: any[];
   };
 }
 
@@ -133,7 +133,7 @@ export default function PublicProductDetailPage() {
   // [FUNGSI INTERSEPSI SUBMIT]: Validasi awal sebelum memunculkan modal konfirmasi
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!produk) return;
+    if (!produk || isSubmitting) return;
 
     if (!alamatPembeli.trim() || !teleponPembeli.trim()) {
       showToast('Alamat dan Nomor Telepon wajib diisi.', 'error');
@@ -161,9 +161,9 @@ export default function PublicProductDetailPage() {
     setShowConfirmModal(true);
   };
 
-  // [FUNGSI PROSES PEMESANAN / TRANSAKSI SEBENARNYA]: Menyimpan data pesanan ke database, simpan flash toast, dan redirect ke /pesanan
+  // [FUNGSI PROSES PEMESANAN / TRANSAKSI SEBENARNYA]: Menyimpan data pesanan ke database, simpan flash toast, dan redirect cepat ke /pesanan
   const executeCheckout = async () => {
-    if (!produk) return;
+    if (!produk || isSubmitting) return;
 
     setIsSubmitting(true);
     setShowConfirmModal(false);
@@ -216,7 +216,7 @@ export default function PublicProductDetailPage() {
 
       if (insertError) throw insertError;
 
-      // [PENGALIHAN KE /pesanan DENGAN FLASH TOAST]: Menyimpan pesan sukses di localStorage lalu redirect ke halaman pesanan
+      // [PENGALIHAN CEPAT KE /pesanan DENGAN FLASH TOAST]: Menyimpan pesan sukses dan langsung redirect tanpa jeda
       localStorage.setItem('flash_toast', 'Pesanan berhasil dibuat! Status: Belum Diterima pemilik.');
       router.push('/pesanan');
     } catch (error: any) {
@@ -481,14 +481,20 @@ export default function PublicProductDetailPage() {
                 </div>
               )}
 
-              {/* Tombol Kirim Pesanan */}
+              {/* [PENGAMAN TOMBOL KIRIM]: Tombol dikunci (disabled) jika isSubmitting bernilai true */}
               <div className="pt-2 flex justify-end">
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full sm:w-auto bg-orange-600 hover:bg-orange-700 text-white px-6 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-colors shadow-sm flex items-center justify-center gap-2"
+                  className={`w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-colors shadow-sm flex items-center justify-center gap-2 text-white ${
+                    isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-orange-600 hover:bg-orange-700'
+                  }`}
                 >
-                  <i className="fa-solid fa-paper-plane"></i> Kirim Pesanan Sekarang
+                  {isSubmitting ? (
+                    <><i className="fa-solid fa-circle-notch fa-spin"></i> Memproses...</>
+                  ) : (
+                    <><i className="fa-solid fa-paper-plane"></i> Kirim Pesanan Sekarang</>
+                  )}
                 </button>
               </div>
             </form>
@@ -513,6 +519,7 @@ export default function PublicProductDetailPage() {
                 type="button"
                 onClick={() => setShowConfirmModal(false)}
                 className="flex-1 px-4 py-2.5 rounded-xl border border-gray-300 text-gray-700 text-xs sm:text-sm font-medium hover:bg-gray-50 transition-colors"
+                disabled={isSubmitting}
               >
                 Batal
               </button>
@@ -521,12 +528,18 @@ export default function PublicProductDetailPage() {
                 disabled={countdown > 0 || isSubmitting}
                 onClick={executeCheckout}
                 className={`flex-1 px-4 py-2.5 rounded-xl text-white text-xs sm:text-sm font-medium transition-colors shadow-sm ${
-                  countdown > 0 
+                  countdown > 0 || isSubmitting
                     ? 'bg-gray-400 cursor-not-allowed' 
                     : 'bg-orange-600 hover:bg-orange-700'
                 }`}
               >
-                {countdown > 0 ? `Tunggu (${countdown}s)` : 'Ya, Proses Sekarang'}
+                {isSubmitting ? (
+                  <><i className="fa-solid fa-circle-notch fa-spin"></i> Memproses...</>
+                ) : countdown > 0 ? (
+                  `Tunggu (${countdown}s)`
+                ) : (
+                  'Ya, Proses Sekarang'
+                )}
               </button>
             </div>
           </div>
