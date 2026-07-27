@@ -43,23 +43,19 @@ export default function BerandaPage() {
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResultItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
- 
   const [similarItems, setSimilarItems] = useState<SearchResultItem[]>([]);
   const [isLoadingSimilar, setIsLoadingSimilar] = useState(false);
 
- 
   const [followedProducts, setFollowedProducts] = useState<any[]>([]);
   const [randomStoresToFollow, setRandomStoresToFollow] = useState<any[]>([]);
   const [isLoadingFeed, setIsLoadingFeed] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  
   useEffect(() => {
     const supabase = createClient();
 
@@ -72,7 +68,7 @@ export default function BerandaPage() {
         const userId = session.user.id;
         setCurrentUserId(userId);
         setLoading(false);
-       
+        
         fetchHomeFeedData(userId, supabase);
       }
     }
@@ -80,12 +76,10 @@ export default function BerandaPage() {
     checkUserSession();
   }, [router]);
 
- 
   const fetchHomeFeedData = async (userId: string, supabase: any) => {
     try {
       setIsLoadingFeed(true);
 
-    
       const { data: followingData } = await supabase
         .from('follower_toko')
         .select('id_toko')
@@ -94,7 +88,6 @@ export default function BerandaPage() {
       const followedStoreIds = (followingData || []).map((f: any) => f.id_toko);
 
       if (followedStoreIds.length > 0) {
-       
         const { data: prodData } = await supabase
           .from('produk')
           .select('id, toko_id, nama, harga, foto, jenis_produk(nama), toko:toko_id(id, user_id, nama)')
@@ -107,18 +100,15 @@ export default function BerandaPage() {
         setFollowedProducts([]);
       }
 
-     
       const { data: allStores } = await supabase
         .from('toko')
         .select('id, user_id, nama, foto, kategori_toko(nama)')
         .neq('user_id', userId);
 
       if (allStores) {
-       
         const unfollowedStores = allStores.filter(
           (store: any) => !followedStoreIds.includes(store.id)
         );
-        // Acak urutan toko (randomize)
         const shuffled = unfollowedStores.sort(() => 0.5 - Math.random());
         setRandomStoresToFollow(shuffled.slice(0, 10));
       }
@@ -129,7 +119,6 @@ export default function BerandaPage() {
     }
   };
 
-  
   const handleSearchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const query = searchQuery.trim();
@@ -141,14 +130,12 @@ export default function BerandaPage() {
     const supabase = createClient();
 
     try {
-      
       const { data: matchedKategori } = await supabase
         .from('kategori_toko')
         .select('id')
         .ilike('nama', `%${query}%`);
       const kategoriIds = (matchedKategori || []).map((k: any) => k.id);
 
-     
       let tokoQuery = supabase
         .from('toko')
         .select('id, user_id, nama, deskripsi, foto, kategori_id, kategori_toko(nama)');
@@ -160,14 +147,12 @@ export default function BerandaPage() {
       }
       const { data: tokoData } = await tokoQuery.limit(10);
 
-     
       const { data: matchedJenis } = await supabase
         .from('jenis_produk')
         .select('id')
         .ilike('nama', `%${query}%`);
       const jenisIds = (matchedJenis || []).map((j: any) => j.id);
 
-      
       let produkQuery = supabase
         .from('produk')
         .select('id, toko_id, nama, harga, foto, jenis_produk_id, jenis_produk(nama), toko:toko_id(id, user_id, nama)');
@@ -191,7 +176,6 @@ export default function BerandaPage() {
 
       const combinedResults = [...formattedTokos, ...formattedProduks];
       setSearchResults(combinedResults);
-
 
       if (combinedResults.length > 0) {
         const firstItem = combinedResults[0];
@@ -257,7 +241,6 @@ export default function BerandaPage() {
           Cari berdasarkan nama toko, produk, kategori toko, atau jenis produk.
         </p>
 
-      
         <form onSubmit={handleSearchSubmit} className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <i className="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
@@ -290,7 +273,6 @@ export default function BerandaPage() {
         </form>
       </div>
 
-     
       {hasSearched && (
         <div className="space-y-4">
           <h2 className="text-lg font-bold text-gray-800 px-1">
@@ -389,7 +371,6 @@ export default function BerandaPage() {
                 })}
               </div>
 
-             
               <div className="space-y-4">
                 <div className="bg-gray-50 rounded-xl p-4 border border-gray-200 sticky top-4">
                   <h3 className="font-bold text-amber-900 text-sm sm:text-base mb-3 flex items-center gap-2">
@@ -476,10 +457,8 @@ export default function BerandaPage() {
         </div>
       )}
 
-     
       <div className="space-y-6 pt-6 border-t border-gray-100">
         
-       
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-base sm:text-lg font-bold text-amber-900 flex items-center gap-2">
@@ -532,7 +511,6 @@ export default function BerandaPage() {
           )}
         </div>
 
-      
         <div className="space-y-4 pt-4 border-t border-gray-100">
           <h2 className="text-base sm:text-lg font-bold text-amber-900 flex items-center gap-2">
             <i className="fa-solid fa-newspaper text-orange-600"></i>
@@ -551,7 +529,8 @@ export default function BerandaPage() {
               <p className="text-[11px] text-gray-400 mt-1">Yuk, ikuti beberapa toko menarik di atas untuk melihat produk terbaru mereka di sini!</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
               {followedProducts.map((prod) => {
                 const isMyStore = prod.toko?.user_id === currentUserId;
                 const prodHref = isMyStore ? `/store/${prod.toko_id}` : `/search-produk/${prod.id}`;
@@ -562,29 +541,29 @@ export default function BerandaPage() {
                     href={prodHref}
                     className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-orange-200 transition-all flex flex-col overflow-hidden group block"
                   >
-                    <div className="h-44 w-full bg-gray-100 flex-shrink-0 relative border-b border-gray-100">
+                    <div className="h-32 sm:h-44 w-full bg-gray-100 flex-shrink-0 relative border-b border-gray-100">
                       {prod.foto ? (
                         <img src={prod.foto} alt={prod.nama} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-gray-300">
-                          <i className="fa-solid fa-box text-4xl"></i>
+                          <i className="fa-solid fa-box text-3xl sm:text-4xl"></i>
                         </div>
                       )}
-                      <div className="absolute bottom-3 left-3 bg-amber-900/90 backdrop-blur-sm text-white px-3 py-1 rounded-lg font-bold shadow-sm text-xs sm:text-sm">
+                      <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 bg-amber-900/90 backdrop-blur-sm text-white px-2 py-0.5 sm:px-3 sm:py-1 rounded-lg font-bold shadow-sm text-[10px] sm:text-sm">
                         {formatRupiah(prod.harga)}
                       </div>
                     </div>
 
-                    <div className="p-4 flex flex-col flex-grow">
+                    <div className="p-3 sm:p-4 flex flex-col flex-grow">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider">
+                        <span className="bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-[8px] sm:text-[9px] font-bold uppercase tracking-wider">
                           {prod.jenis_produk?.nama || 'Produk'}
                         </span>
-                        <span className="text-[11px] text-gray-500 font-medium truncate max-w-[120px]">
+                        <span className="text-[10px] text-gray-500 font-medium truncate max-w-[90px] sm:max-w-[120px]">
                           di {prod.toko?.nama || 'Toko'}
                         </span>
                       </div>
-                      <h3 className="text-sm sm:text-base font-bold text-gray-900 group-hover:text-orange-700 transition-colors leading-tight truncate">
+                      <h3 className="text-xs sm:text-base font-bold text-gray-900 group-hover:text-orange-700 transition-colors leading-tight truncate">
                         {prod.nama}
                       </h3>
                     </div>
