@@ -161,7 +161,7 @@ export default function PublicProductDetailPage() {
     setShowConfirmModal(true);
   };
 
-  // [FUNGSI PROSES PEMESANAN / TRANSAKSI]: Menyimpan data pesanan ke database (nomor_pesanan di-generate otomatis oleh database trigger)
+  // [FUNGSI PROSES PEMESANAN / TRANSAKSI DENGAN NOMOR PESANAN EKSPLISIT]: Menghitung nomor urut pesanan khusus per toko agar tidak bernilai null
   const executeCheckout = async () => {
     if (!produk || isSubmitting) return;
 
@@ -196,9 +196,18 @@ export default function PublicProductDetailPage() {
         buktiUrl = publicUrlData.publicUrl;
       }
 
+      // [HITUNG NOMOR PESANAN SPESIFIK PER TOKO]: Menghitung jumlah pesanan yang ada di toko ini lalu ditambah 1
+      const { count, error: countError } = await supabase
+        .from('pesanan')
+        .select('*', { count: 'exact', head: true })
+        .eq('toko_id', produk.toko_id);
+
+      if (countError) throw countError;
+
+      const nextNomorPesanan = (count || 0) + 1;
       const totalHarga = produk.harga * jumlah;
 
-      // [INSERT DATA KE DATABASE]: Mengirim data transaksi tanpa perlu menyertakan nomor_pesanan secara manual
+      // [INSERT DATA KE DATABASE]: Menyertakan nomor_pesanan secara eksplisit agar tidak null
       const { error: insertError } = await supabase
         .from('pesanan')
         .insert({
@@ -212,6 +221,7 @@ export default function PublicProductDetailPage() {
           alamat_pembeli: alamatPembeli,
           telepon_pembeli: teleponPembeli,
           jawaban_pertanyaan: jawabanPertanyaan,
+          nomor_pesanan: nextNomorPesanan,
           status: 'Belum Diterima',
         });
 
