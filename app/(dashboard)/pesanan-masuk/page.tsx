@@ -271,19 +271,22 @@ export default function PesananMasukPage() {
     }
   };
 
+  // [PERBAIKAN]: Menyempurnakan format Ekspor Excel (CSV) agar bersih, selaras dengan view, dan bebas dari karakter ganda atau koma berlebih
   const handleExportExcel = () => {
     const colsToExport = activeColumns.filter(c => c.id !== 'aksi');
     if (colsToExport.length === 0) return showToast('Pilih setidaknya satu kolom untuk diekspor', 'error');
 
-    const headerRow = colsToExport.map(c => `"${c.label}"`).join(',');
+    const headerRow = colsToExport.map(c => `"${c.label.replace(/"/g, '""')}"`).join(',');
     const dataRows = pesananDitampilkan.map(pesanan => {
       return colsToExport.map(col => {
         const rawValue = getRawCellValue(pesanan, col.id);
-        return `"${rawValue.replace(/"/g, '""')}"`;
+        // Membersihkan string dari kutipan atau karakter ganda yang merusak struktur CSV
+        const cleanValue = rawValue.replace(/"/g, '""').trim();
+        return `"${cleanValue}"`;
       }).join(',');
     });
 
-    const csvContent = [headerRow, ...dataRows].join('\n');
+    const csvContent = [headerRow, ...dataRows].join('\r\n');
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -292,7 +295,7 @@ export default function PesananMasukPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast('Berhasil diekspor ke format Excel (CSV)', 'success');
+    showToast('Berhasil diekspor ke format Excel (CSV) secara bersih', 'success');
   };
 
   const handleExportPDF = () => {
@@ -302,14 +305,14 @@ export default function PesananMasukPage() {
     let html = '<table border="1" style="border-collapse: collapse; width: 100%; font-family: sans-serif; font-size: 12px; text-align: left;">';
     html += '<thead><tr style="background-color: #f3f4f6;">';
     colsToExport.forEach(c => {
-      html += `<th style="padding: 8px;">${c.label}</th>`;
+      html += `<th style="padding: 8px; border: 1px solid #ddd;">${c.label}</th>`;
     });
     html += '</tr></thead>';
     html += '<tbody>';
     pesananDitampilkan.forEach(pesanan => {
       html += '<tr>';
       colsToExport.forEach(col => {
-        html += `<td style="padding: 8px;">${getRawCellValue(pesanan, col.id)}</td>`;
+        html += `<td style="padding: 8px; border: 1px solid #ddd;">${getRawCellValue(pesanan, col.id)}</td>`;
       });
       html += '</tr>';
     });
@@ -366,13 +369,11 @@ export default function PesananMasukPage() {
     setDeleteModalVisible(true);
   };
 
-  // [PERBAIKAN]: Menggunakan Postgres Stored Procedure RPC untuk menghapus dan menurunkan nomor urut secara aman dan instan
   const executeDeletePesanan = async () => {
     if (!selectedActionPesanan || deleteConfirmationText !== 'HAPUS') return;
     setIsProcessingAction(true);
     
     try {
-      // Memanggil fungsi RPC database Supabase yang menangani hapus dan geser nomor secara bersamaan
       const { error: rpcError } = await supabase.rpc('hapus_dan_geser_pesanan', {
         target_pesanan_id: selectedActionPesanan.id,
         target_toko_id: selectedActionPesanan.toko_id,
@@ -632,7 +633,7 @@ export default function PesananMasukPage() {
                 <thead>
                   <tr className="bg-orange-50 border-b border-orange-100 text-xs font-bold text-amber-900 uppercase tracking-wider">
                     {activeColumns.map(col => (
-                      <th key={`th_${col.id}`} className="p-3 border-r border-orange-100 last:border-r-0">
+                      <th key={`th_${col.id}`} className="p-3 border-r border-orange-100 last:border-r-0 border border-gray-300">
                         {col.label}
                       </th>
                     ))}
@@ -642,7 +643,7 @@ export default function PesananMasukPage() {
                   {paginatedPesanan.map((pesanan, idx) => (
                     <tr key={pesanan.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-orange-50/50 border-b border-gray-100 transition-colors`}>
                       {activeColumns.map(col => (
-                        <td key={`td_${pesanan.id}_${col.id}`} className={`p-3 border-r border-gray-100 last:border-r-0`}>
+                        <td key={`td_${pesanan.id}_${col.id}`} className={`p-3 border-r border-gray-100 last:border-r-0 border border-gray-200`}>
                           {renderTableCell(pesanan, col.id)}
                         </td>
                       ))}
