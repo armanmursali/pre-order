@@ -271,17 +271,21 @@ export default function PesananMasukPage() {
     }
   };
 
+  // [PERBAIKAN]: Menggunakan pemisah titik koma (;) agar Excel otomatis mendeteksi kolom secara terpisah tanpa menggumpal jadi satu kolom
   const handleExportExcel = () => {
     const colsToExport = activeColumns.filter(c => c.id !== 'aksi');
     if (colsToExport.length === 0) return showToast('Pilih setidaknya satu kolom untuk diekspor', 'error');
 
-    const headerRow = colsToExport.map(c => `"${c.label.replace(/"/g, '""')}"`).join(',');
+    // Menggunakan pemisah titik koma (;) agar kompatibel sempurna dengan Excel regional Indonesia
+    const delimiter = ';';
+
+    const headerRow = colsToExport.map(c => `"${c.label.replace(/"/g, '""')}"`).join(delimiter);
     const dataRows = pesananDitampilkan.map(pesanan => {
       return colsToExport.map(col => {
         const rawValue = getRawCellValue(pesanan, col.id);
         const cleanValue = rawValue.replace(/"/g, '""').trim();
         return `"${cleanValue}"`;
-      }).join(',');
+      }).join(delimiter);
     });
 
     const csvContent = [headerRow, ...dataRows].join('\r\n');
@@ -293,7 +297,7 @@ export default function PesananMasukPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast('Berhasil diekspor ke format Excel (CSV) secara dinamis & bersih', 'success');
+    showToast('Berhasil diekspor ke Excel dengan kolom terpisah rapi', 'success');
   };
 
   const handleExportPDF = () => {
@@ -878,7 +882,7 @@ export default function PesananMasukPage() {
         </div>
       )}
 
-      {/* [PERBAIKAN]: Memperbaiki typo variabel previewBuktin menjadi previewBukti dan casting non-null pada src */}
+      {/* Modal Preview Bukti Transfer */}
       {previewBukti && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md" onClick={() => setPreviewBukti(null)}>
           <div className="relative max-w-2xl w-full max-h-[90vh] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
