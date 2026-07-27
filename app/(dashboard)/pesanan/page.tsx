@@ -134,6 +134,7 @@ export default function PesananPage() {
     setDeleteModalVisible(true);
   };
 
+  // [PERBAIKAN]: Logika Utama Batalkan Pesanan oleh Pembeli + Penurunan Nomor Antrean Dinamis Secara Menyeluruh di Toko Terkait
   const executeDeletePesanan = async () => {
     if (!selectedDeletePesanan || deleteConfirmationText !== 'HAPUS') return;
     setIsProcessingAction(true);
@@ -144,6 +145,7 @@ export default function PesananPage() {
 
       if (!currentTokoId) throw new Error("ID Toko tidak terdeteksi pada pesanan ini.");
 
+      // 1. Eksekusi hapus pesanan milik pembeli di database
       const { error: deleteError } = await supabase
         .from('pesanan')
         .delete()
@@ -151,6 +153,7 @@ export default function PesananPage() {
 
       if (deleteError) throw deleteError;
 
+      // 2. Ambil semua pesanan lain di toko yang sama yang nomor_pesanannya lebih besar dari yang dihapus
       const { data: toUpdate, error: fetchError } = await supabase
         .from('pesanan')
         .select('id, nomor_pesanan')
@@ -159,6 +162,7 @@ export default function PesananPage() {
 
       if (fetchError) throw fetchError;
 
+      // 3. Lakukan perulangan update untuk menurunkan nomor pesanan di bawahnya sebanyak 1 angka secara dinamis
       if (toUpdate && toUpdate.length > 0) {
         for (const item of toUpdate) {
           const { error: updateError } = await supabase
@@ -170,7 +174,7 @@ export default function PesananPage() {
         }
       }
       
-      setToast({ message: 'Pesanan berhasil dibatalkan dan dihapus.', type: 'success' });
+      setToast({ message: 'Pesanan berhasil dibatalkan dan nomor antrean diperbarui.', type: 'success' });
       setDeleteModalVisible(false);
       
       if (paginatedPesanan.length === 1 && currentPage > 1) {
@@ -320,7 +324,6 @@ export default function PesananPage() {
             ))}
           </div>
 
-          {/* [PERBAIKAN]: Menambahkan tipe data eksplisit (newVal: number) pada parameter callback untuk meredam galat TypeScript */}
           <Paginator 
             currentPage={currentPage}
             totalPages={totalPages}

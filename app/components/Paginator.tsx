@@ -9,7 +9,7 @@ interface PaginatorProps {
   totalItems: number;
   itemsPerPage: number;
   onPageChange: (page: number) => void;
-  onItemsPerPageChange: (items: number) => void; // [PERBAIKAN]: Menetapkan tipe data number secara eksplisit
+  onItemsPerPageChange: (items: number) => void; 
 }
 
 export default function Paginator({
