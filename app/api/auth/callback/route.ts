@@ -42,29 +42,32 @@ export async function GET(request: Request) {
     if (!error && sessionData?.user) {
       const authUser = sessionData.user;
 
-     
+      
       try {
         const generateRandomPassword = () => {
           return Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2) + Date.now().toString(36);
         };
 
-       
-        const { data: existingUser } = await supabase
+      
+        const { data: existingUser, error: fetchErr } = await supabase
           .from('users')
           .select('password')
           .eq('id', authUser.id)
           .maybeSingle();
 
-       
-        if (!existingUser || !existingUser.password) {
+      
+        if (fetchErr || !existingUser || !existingUser.password) {
           const randomPassword = generateRandomPassword();
-          
+          const userNama = authUser.user_metadata?.full_name || authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Pengguna';
+          const userEmail = authUser.email || '';
+
+         
           const { error: upsertError } = await supabase
             .from('users')
             .upsert({
               id: authUser.id,
-              nama: authUser.user_metadata?.full_name || authUser.user_metadata?.name || 'Pengguna',
-              email: authUser.email || '',
+              nama: userNama,
+              email: userEmail,
               password: randomPassword,
               updated_at: new Date().toISOString(),
             }, { onConflict: 'id' });
