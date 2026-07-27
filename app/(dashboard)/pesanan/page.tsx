@@ -36,9 +36,17 @@ export default function PesananPage() {
   const [pesananList, setPesananList] = useState<PesananItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // Memeriksa sesi pengguna dan mengambil daftar pesanan milik user aktif
+  // [EFEK FLASH TOAST & FETCH PESANAN]: Menangkap flash toast dari localStorage dan mengambil data pesanan
   useEffect(() => {
+    const flashMessage = localStorage.getItem('flash_toast');
+    if (flashMessage) {
+      setToast({ message: flashMessage, type: 'success' });
+      localStorage.removeItem('flash_toast');
+      setTimeout(() => setToast(null), 4000);
+    }
+
     async function fetchUserPesanan() {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
@@ -49,7 +57,6 @@ export default function PesananPage() {
 
       const userId = session.user.id;
 
-      // Ambil data pesanan di mana pembeli_id adalah user yang sedang login
       const { data, error } = await supabase
         .from('pesanan')
         .select(`
@@ -72,7 +79,6 @@ export default function PesananPage() {
       if (error) {
         console.error('Gagal memuat data pesanan:', error.message);
       } else if (data) {
-        // [PERBAIKAN PRESISI TYPESCRIPT]: Memetakan data secara aman tanpa error konversi tipe
         const formattedData: PesananItem[] = (data || []).map((item: any) => ({
           ...item,
           produk: Array.isArray(item.produk) ? item.produk[0] : item.produk,
@@ -224,6 +230,17 @@ export default function PesananPage() {
               alt="Pratinjau Penuh"
               className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl border border-gray-700 bg-white"
             />
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[200] transition-all duration-300 ease-in-out">
+          <div className={`flex items-center gap-2.5 sm:gap-3 px-4 sm:px-5 py-3 sm:py-3.5 rounded-xl shadow-xl text-white font-medium ${
+            toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+          }`}>
+            <i className={`fa-solid ${toast.type === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'} text-lg sm:text-xl`}></i>
+            <span className="text-xs sm:text-sm tracking-wide">{toast.message}</span>
           </div>
         </div>
       )}
