@@ -9,7 +9,6 @@ import Paginator from '../../components/Paginator';
 
 interface PesananItem {
   id: string;
-  toko_id: string; 
   nomor_pesanan: number;
   jumlah: number;
   total_harga: number;
@@ -40,17 +39,10 @@ export default function PesananPage() {
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  const [deleteModalVisible, setDeleteModalVisible] = useState<boolean>(false);
-  const [selectedDeletePesanan, setSelectedDeletePesanan] = useState<PesananItem | null>(null);
-  const [deleteConfirmationText, setDeleteConfirmationText] = useState<string>('');
-  const [deleteCountdown, setDeleteCountdown] = useState<number>(5);
-  const [isProcessingAction, setIsProcessingAction] = useState<boolean>(false);
-
   // State untuk Pagination
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(25);
 
-  // [FUNGSI FETCH]: Mengambil data pesanan milik user yang sedang login
   const fetchUserPesanan = async () => {
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -110,85 +102,12 @@ export default function PesananPage() {
     fetchUserPesanan();
   }, [router, supabase]);
 
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (deleteModalVisible && deleteCountdown > 0) {
-      timer = setInterval(() => {
-        setDeleteCountdown((prev) => prev - 1);
-      }, 1000);
-    }
-    return () => clearInterval(timer);
-  }, [deleteModalVisible, deleteCountdown]);
-
   const formatRupiah = (angka: number) => {
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',
       currency: 'IDR',
       minimumFractionDigits: 0,
     }).format(angka);
-  };
-
-  const openDeleteModal = (pesanan: PesananItem) => {
-    setSelectedDeletePesanan(pesanan);
-    setDeleteConfirmationText('');
-    setDeleteCountdown(5);
-    setDeleteModalVisible(true);
-  };
-
-  // [FUNGSI UTAMA HAPUS & UPDATE ANTREAN]: Menghapus pesanan dan menurunkan nomor antrean pesanan di bawahnya secara dinamis
-  const executeDeletePesanan = async () => {
-    if (!selectedDeletePesanan || deleteConfirmationText !== 'HAPUS') return;
-    setIsProcessingAction(true);
-    
-    try {
-      const deletedNomor = selectedDeletePesanan.nomor_pesanan;
-      const currentTokoId = selectedDeletePesanan.toko_id; 
-
-      if (!currentTokoId) throw new Error("ID Toko tidak terdeteksi pada pesanan ini.");
-
-      // 1. Eksekusi hapus pesanan utama milik pembeli
-      const { error: deleteError } = await supabase
-        .from('pesanan')
-        .delete()
-        .eq('id', selectedDeletePesanan.id);
-
-      if (deleteError) throw deleteError;
-
-      // 2. Ambil semua pesanan lain di toko yang sama yang nomor_pesanannya lebih besar
-      const { data: toUpdate, error: fetchError } = await supabase
-        .from('pesanan')
-        .select('id, nomor_pesanan')
-        .eq('toko_id', currentTokoId)
-        .gt('nomor_pesanan', deletedNomor);
-
-      if (fetchError) throw fetchError;
-
-      // 3. Lakukan perulangan update untuk menurunkan nomor pesanan milik orang lain sebanyak 1 angka
-      if (toUpdate && toUpdate.length > 0) {
-        for (const item of toUpdate) {
-          const { error: updateError } = await supabase
-            .from('pesanan')
-            .update({ nomor_pesanan: item.nomor_pesanan - 1 })
-            .eq('id', item.id);
-
-          if (updateError) throw updateError;
-        }
-      }
-      
-      setToast({ message: 'Pesanan berhasil dibatalkan dan nomor antrean diperbarui.', type: 'success' });
-      setDeleteModalVisible(false);
-      
-      if (paginatedPesanan.length === 1 && currentPage > 1) {
-        setCurrentPage((prev) => prev - 1);
-      }
-
-      fetchUserPesanan();
-    } catch (err: any) {
-      setToast({ message: 'Gagal membatalkan pesanan: ' + (err.message || JSON.stringify(err)), type: 'error' });
-      console.error('Error saat membatalkan pesanan:', err);
-    } finally {
-      setIsProcessingAction(false);
-    }
   };
 
   // Kalkulasi data untuk Pagination
@@ -284,7 +203,7 @@ export default function PesananPage() {
                   </div>
                 </div>
 
-                {/* Bagian Kanan: Status, Bukti Transfer, & Tombol Hapus */}
+                {/* Bagian Kanan: Status & Bukti Transfer (Tombol Batalkan Pesanan telah dikeluarkan/dihapus sesuai instruksi) */}
                 <div className="flex flex-col sm:flex-row md:flex-col items-end justify-between w-full md:w-auto gap-3 border-t md:border-t-0 pt-3 md:pt-0 border-gray-100">
                   
                   <div className="flex flex-col items-end gap-2 w-full">
@@ -311,17 +230,6 @@ export default function PesananPage() {
                         <span className="hidden sm:inline">Bukti Transfer</span>
                       </button>
                     )}
-                    
-                    {item.status === 'Belum Diterima' && (
-                      <button
-                        type="button"
-                        onClick={() => openDeleteModal(item)}
-                        className="text-xs text-red-600 hover:text-white font-semibold flex items-center gap-1.5 bg-red-50 hover:bg-red-600 px-3 py-1.5 rounded-lg border border-red-200 transition-colors"
-                      >
-                        <i className="fa-solid fa-trash-can"></i>
-                        <span>Batalkan Pesanan</span>
-                      </button>
-                    )}
                   </div>
 
                 </div>
@@ -341,65 +249,6 @@ export default function PesananPage() {
             }}
           />
         </>
-      )}
-
-      {/* Modal Konfirmasi Hapus */}
-      {deleteModalVisible && selectedDeletePesanan && (
-        <div className="fixed inset-0 z-[260] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-200 space-y-4 text-center relative">
-            <div className="w-14 h-14 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-2xl">
-              <i className="fa-solid fa-triangle-exclamation"></i>
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-bold text-red-600">Batalkan Pesanan</h3>
-              <p className="text-xs sm:text-sm text-gray-600 mt-2">
-                Anda akan membatalkan pesanan produk <strong className="text-gray-900">{selectedDeletePesanan.produk?.nama}</strong> secara permanen.
-              </p>
-              <p className="text-xs font-bold text-gray-800 mt-2 bg-gray-50 py-2 rounded border border-gray-200">
-                Ketik <span className="text-red-600 select-all">HAPUS</span> untuk melanjutkan pembatalan.
-              </p>
-            </div>
-
-            <div className="pt-2">
-              <input 
-                type="text" 
-                placeholder="Ketik HAPUS di sini..." 
-                value={deleteConfirmationText}
-                onChange={(e) => setDeleteConfirmationText(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-bold text-center outline-none focus:ring-2 focus:ring-red-500 uppercase tracking-widest text-red-600"
-              />
-            </div>
-
-            <div className="flex flex-col gap-2 pt-2">
-              <button
-                type="button"
-                disabled={isProcessingAction || deleteCountdown > 0 || deleteConfirmationText !== 'HAPUS'}
-                onClick={executeDeletePesanan}
-                className={`w-full py-2.5 rounded-xl text-white text-xs sm:text-sm font-bold transition-colors shadow-sm flex items-center justify-center gap-2 ${
-                  (isProcessingAction || deleteCountdown > 0 || deleteConfirmationText !== 'HAPUS') ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'
-                }`}
-              >
-                {isProcessingAction ? (
-                  <><i className="fa-solid fa-circle-notch fa-spin"></i> Memproses...</>
-                ) : deleteCountdown > 0 ? (
-                  `Tunggu (${deleteCountdown} detik)`
-                ) : (
-                  <><i className="fa-solid fa-trash-can"></i> Ya, Batalkan Pesanan</>
-                )}
-              </button>
-
-              <button
-                type="button"
-                disabled={isProcessingAction}
-                onClick={() => setDeleteModalVisible(false)}
-                className="w-full py-2.5 rounded-xl text-gray-600 bg-gray-100 hover:bg-gray-200 text-xs sm:text-sm font-medium transition-colors"
-              >
-                Kembali
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Modal Preview Gambar */}
