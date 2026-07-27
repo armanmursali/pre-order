@@ -24,6 +24,7 @@ interface ProdukDetail {
     alamat?: string | null;
     rekening?: string | null;
     metode_pembayaran?: string | null;
+    konfigurasi_pertanyaan?: any[]; // [PENYESUAIAN PERTANYAAN KUSTOM]: Menampung daftar pertanyaan dari toko
   };
 }
 
@@ -38,13 +39,14 @@ export default function PublicProductDetailPage() {
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  // [STATE TRANSAKSI]: Kuantitas, Alamat, Telepon, Metode Pembayaran Pilihan, File Bukti Transfer
+  // [STATE TRANSAKSI]: Kuantitas, Alamat, Telepon, Metode Pembayaran, Bukti Transfer, & Jawaban Pertanyaan Kustom
   const [jumlah, setJumlah] = useState<number>(1);
   const [alamatPembeli, setAlamatPembeli] = useState<string>('');
   const [teleponPembeli, setTeleponPembeli] = useState<string>('');
   const [metodePilihan, setMetodePilihan] = useState<string>('Tunai');
   const [fileBukti, setFileBukti] = useState<File | null>(null);
   const [previewBukti, setPreviewBukti] = useState<string>('');
+  const [jawabanPertanyaan, setJawabanPertanyaan] = useState<{ [key: string]: string }>({});
 
   // [STATE MODAL KONFIRMASI & HITUNG MUNDUR 5 DETIK]
   const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
@@ -87,14 +89,14 @@ export default function PublicProductDetailPage() {
     }).format(angka);
   };
 
-  // [FUNGSI AMBIL DATA PRODUK PUBLIK]: Mengambil detail produk beserta informasi toko pemiliknya dari Supabase
+  // [FUNGSI AMBIL DATA PRODUK PUBLIK]: Mengambil detail produk beserta informasi toko dan konfigurasi pertanyaannya dari Supabase
   const fetchPublicProductData = async (targetId: string) => {
     try {
       setLoading(true);
 
       const { data: dataProduk, error: errorProduk } = await supabase
         .from('produk')
-        .select('*, jenis_produk(nama), toko:toko_id(id, user_id, nama, telepon, alamat, rekening, metode_pembayaran)')
+        .select('*, jenis_produk(nama), toko:toko_id(id, user_id, nama, telepon, alamat, rekening, metode_pembayaran, konfigurasi_pertanyaan)')
         .eq('id', targetId)
         .maybeSingle();
 
@@ -111,6 +113,15 @@ export default function PublicProductDetailPage() {
         } else {
           setMetodePilihan('Tunai');
         }
+      }
+
+      // Inisialisasi awal state jawaban pertanyaan kustom jika ada
+      if (dataProduk.toko?.konfigurasi_pertanyaan && Array.isArray(dataProduk.toko.konfigurasi_pertanyaan)) {
+        const initialAnswers: { [key: string]: string } = {};
+        dataProduk.toko.konfigurasi_pertanyaan.forEach((item: any) => {
+          initialAnswers[item.id || item.pertanyaan] = '';
+        });
+        setJawabanPertanyaan(initialAnswers);
       }
     } catch (error: any) {
       console.error('Terjadi kesalahan sistem:', error.message);
@@ -129,6 +140,17 @@ export default function PublicProductDetailPage() {
       return;
     }
 
+    // Validasi pertanyaan kustom wajib diisi
+    if (produk.toko?.konfigurasi_pertanyaan && Array.isArray(produk.toko.konfigurasi_pertanyaan)) {
+      for (const item of produk.toko.konfigurasi_pertanyaan) {
+        const key = item.id || item.pertanyaan;
+        if (!jawabanPertanyaan[key] || !jawabanPertanyaan[key].trim()) {
+          showToast(`Pertanyaan "${item.pertanyaan}" wajib diisi.`, 'error');
+          return;
+        }
+      }
+    }
+
     if (metodePilihan === 'Transfer' && !fileBukti) {
       showToast('Silakan unggah bukti transfer terlebih dahulu.', 'error');
       return;
@@ -139,7 +161,7 @@ export default function PublicProductDetailPage() {
     setShowConfirmModal(true);
   };
 
-  // [FUNGSI PROSES PEMESANAN / TRANSAKSI SEBENARNYA]: Menyimpan data pesanan ke database dan redirect ke beranda
+  // [FUNGSI PROSES PEMESANAN / TRANSAKSI SEBENARNYA]: Menyimpan data pesanan ke database, simpan flash toast, dan redirect ke /pesanan
   const executeCheckout = async () => {
     if (!produk) return;
 
@@ -188,14 +210,15 @@ export default function PublicProductDetailPage() {
           bukti_transfer: buktiUrl,
           alamat_pembeli: alamatPembeli,
           telepon_pembeli: teleponPembeli,
+          jawaban_pertanyaan: jawabanPertanyaan,
           status: 'Belum Diterima',
         });
 
       if (insertError) throw insertError;
 
-      // Simpan flash toast sukses di localStorage atau langsung redirect dengan query/router state, lalu arahkan ke /beranda
+      // [PENGALIHAN KE /pesanan DENGAN FLASH TOAST]: Menyimpan pesan sukses di localStorage lalu redirect ke halaman pesanan
       localStorage.setItem('flash_toast', 'Pesanan berhasil dibuat! Status: Belum Diterima pemilik.');
-      router.push('/beranda');
+      router.push('/pesanan');
     } catch (error: any) {
       showToast('Gagal memproses pesanan: ' + error.message, 'error');
       setIsSubmitting(false);
@@ -367,6 +390,51 @@ export default function PublicProductDetailPage() {
                   required
                 ></textarea>
               </div>
+
+              {/* [RENDER PERTANYAAN KUSTOM DARI TOKO]: Render dinamis berdasarkan konfigurasi toko (teks / radio button) */}
+              {produk.toko?.konfigurasi_pertanyaan && produk.toko.konfigurasi_pertanyaan.length > 0 && (
+                <div className="p-4 bg-orange-50/40 rounded-xl border border-orange-200 space-y-3">
+                  <h4 className="text-xs font-bold text-amber-900 uppercase tracking-wider">Pertanyaan Tambahan dari Toko</h4>
+                  {produk.toko.konfigurasi_pertanyaan.map((item: any, index: number) => {
+                    const qKey = item.id || item.pertanyaan;
+                    return (
+                      <div key={qKey} className="space-y-1.5">
+                        <label className="block text-xs font-semibold text-gray-800">
+                          {index + 1}. {item.pertanyaan} <span className="text-red-500">*</span>
+                        </label>
+
+                        {item.tipe === 'radio' ? (
+                          <div className="space-y-1 pl-2">
+                            {(item.opsi || []).map((opt: string, oIdx: number) => (
+                              <label key={oIdx} className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name={`custom-q-${qKey}`}
+                                  value={opt}
+                                  checked={jawabanPertanyaan[qKey] === opt}
+                                  onChange={(e) => setJawabanPertanyaan({ ...jawabanPertanyaan, [qKey]: e.target.value })}
+                                  className="text-orange-600 focus:ring-orange-500"
+                                  required
+                                />
+                                <span>{opt}</span>
+                              </label>
+                            ))}
+                          </div>
+                        ) : (
+                          <input
+                            type="text"
+                            value={jawabanPertanyaan[qKey] || ''}
+                            onChange={(e) => setJawabanPertanyaan({ ...jawabanPertanyaan, [qKey]: e.target.value })}
+                            placeholder="Tuliskan jawaban Anda..."
+                            className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-xs bg-white text-gray-900 outline-none focus:ring-2 focus:ring-orange-500"
+                            required
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* Pilihan Jenis Pembayaran */}
               <div>
