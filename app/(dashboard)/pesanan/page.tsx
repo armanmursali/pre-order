@@ -22,11 +22,11 @@ interface PesananItem {
     nama: string;
     harga: number;
     foto: string | null;
-  };
+  } | null;
   toko?: {
     id: string;
     nama: string;
-  };
+  } | null;
 }
 
 export default function PesananPage() {
@@ -72,7 +72,13 @@ export default function PesananPage() {
       if (error) {
         console.error('Gagal memuat data pesanan:', error.message);
       } else if (data) {
-        setPesananList(data as PesananItem[]);
+        // [PERBAIKAN PRESISI TYPESCRIPT]: Memetakan data secara aman tanpa error konversi tipe
+        const formattedData: PesananItem[] = (data || []).map((item: any) => ({
+          ...item,
+          produk: Array.isArray(item.produk) ? item.produk[0] : item.produk,
+          toko: Array.isArray(item.toko) ? item.toko[0] : item.toko,
+        }));
+        setPesananList(formattedData);
       }
 
       setLoading(false);
