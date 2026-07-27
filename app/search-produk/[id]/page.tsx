@@ -161,7 +161,7 @@ export default function PublicProductDetailPage() {
     setShowConfirmModal(true);
   };
 
-  // [FUNGSI PROSES PEMESANAN / TRANSAKSI DENGAN RPC ATOMIK]: Memanggil fungsi database untuk mendapatkan nomor pesanan unik tanpa berebutan
+  // [FUNGSI PROSES PEMESANAN / TRANSAKSI DENGAN PANGGILAN RPC SUPABASE]: Menjamin nomor pesanan unik, berurutan, dan tidak pernah sama
   const executeCheckout = async () => {
     if (!produk || isSubmitting) return;
 
@@ -196,16 +196,16 @@ export default function PublicProductDetailPage() {
         buktiUrl = publicUrlData.publicUrl;
       }
 
-      // [AMBIL NOMOR PESANAN VIA RPC SUPABASE]: Menghindari race condition antarpengguna secara aman
+      // [PANGGILAN RPC KE SUPABASE]: Meminta nomor urut pesanan terbaru yang dijamin aman dan akurat per toko
       const { data: nomorUrut, error: rpcError } = await supabase
         .rpc('generate_nomor_pesanan', { p_toko_id: produk.toko_id });
 
       if (rpcError) throw rpcError;
 
-      const nextNomorPesanan = nomorUrut || 1;
+      const nextNomorPesanan = nomorUrut !== null && nomorUrut !== undefined ? Number(nomorUrut) : 1;
       const totalHarga = produk.harga * jumlah;
 
-      // [INSERT DATA PESANAN KE DATABASE]: Menyertakan nomor_pesanan hasil RPC yang dijamin unik per toko
+      // [INSERT DATA KE DATABASE]: Menyertakan nomor_pesanan hasil RPC secara eksplisit
       const { error: insertError } = await supabase
         .from('pesanan')
         .insert({
