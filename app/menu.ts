@@ -12,4 +12,6 @@ export const navMenus: MenuItem[] = [
   { name: 'Pesanan Saya', href: '/pesanan', icon: 'fa-solid fa-receipt' },
   { name: 'Pesanan Masuk', href: '/pesanan-masuk', icon: 'fa-solid fa-inbox' },
   { name: 'Pendapatan', href: '/pendapatan', icon: 'fa-solid fa-wallet' },
+
+  { name: 'Admin', href: '/admin', icon: 'fa-solid fa-user-shield' },
 ];

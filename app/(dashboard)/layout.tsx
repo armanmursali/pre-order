@@ -21,6 +21,9 @@ export default function DashboardLayout({
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState<number>(0);
+  
+  // [STATE ADMIN]: State untuk memvalidasi apakah user yang login merupakan seorang admin
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -31,6 +34,17 @@ export default function DashboardLayout({
 
       if (session?.user) {
         const userId = session.user.id;
+
+        // [PENGECEKAN STATUS ADMIN]: Validasi apakah user terdaftar di tabel admin
+        const { data: adminData } = await supabase
+          .from('admin')
+          .select('id')
+          .eq('id_users', userId)
+          .maybeSingle();
+
+        if (adminData) {
+          setIsAdmin(true);
+        }
 
         const { data: userData, error } = await supabase
           .from('users')
@@ -107,7 +121,7 @@ export default function DashboardLayout({
         <div className={`flex h-16 items-center px-6 border-b border-gray-200 ${isDesktopCollapsed ? 'justify-center' : 'justify-between'}`}>
           <div className="flex items-center gap-3">
             <img src="/logo.png" alt="Logo AtributShop" className="w-8 h-8 object-contain shrink-0" />
-            <span className={`text-xl font-bold text-gray-800 transition-opacity duration-300 ${isDesktopCollapsed ? 'hidden md:hidden' : 'block'}`}>
+            <span className={`text-xl font-bold text-amber-900 transition-opacity duration-300 ${isDesktopCollapsed ? 'hidden md:hidden' : 'block'}`}>
               AtributShop
             </span>
           </div>
@@ -121,17 +135,24 @@ export default function DashboardLayout({
 
         <nav className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
           {navMenus.map((menu) => {
+            // [VALIDASI MENU ADMIN]: Sembunyikan menu Admin jika user aktif bukan admin
+            if (menu.href === '/admin' && !isAdmin) {
+              return null;
+            }
+
             const isActive = pathname === menu.href;
             return (
               <Link
                 key={menu.name}
                 href={menu.href}
-                className={`flex items-center rounded-lg text-sm font-medium transition-all ${
+                // [OTOMATIS TUTUP SIDEBAR MOBILE]: Menambahkan event onClick untuk menutup sidebar setelah berpindah menu di perangkat seluler
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center rounded-xl text-sm font-medium transition-all ${
                   isDesktopCollapsed ? 'justify-center py-3' : 'gap-3 px-4 py-2.5'
                 } ${
                   isActive
-                    ? 'bg-blue-50 text-blue-600'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    ? 'bg-amber-800 text-white shadow-sm font-bold' // [TEMA ORANYE TUA & COKELAT]: Warna aktif menu
+                    : 'text-gray-600 hover:bg-orange-50 hover:text-amber-900' // [TEMA ORANYE TUA & COKELAT]: Warna hover menu
                 }`}
                 title={isDesktopCollapsed ? menu.name : undefined}
               >
@@ -147,7 +168,7 @@ export default function DashboardLayout({
         <div className="p-4 border-t border-gray-200">
           <button
             onClick={handleLogout}
-            className={`flex w-full items-center rounded-lg bg-red-50 text-sm font-medium text-red-600 transition hover:bg-red-100 ${
+            className={`flex w-full items-center rounded-xl bg-red-50 text-sm font-medium text-red-600 transition hover:bg-red-100 ${
               isDesktopCollapsed ? 'justify-center py-3' : 'justify-center gap-2 py-2.5 px-4'
             }`}
             title={isDesktopCollapsed ? 'Keluar (Logout)' : undefined}
@@ -171,7 +192,7 @@ export default function DashboardLayout({
             </button>
             <button
               onClick={() => setIsDesktopCollapsed(!isDesktopCollapsed)}
-              className="hidden md:flex text-gray-500 hover:text-gray-700 focus:outline-none transition items-center justify-center w-8 h-8 rounded-full hover:bg-gray-100"
+              className="hidden md:flex text-gray-500 hover:text-amber-900 focus:outline-none transition items-center justify-center w-8 h-8 rounded-full hover:bg-orange-50"
             >
               <i className="fa-solid fa-bars-staggered text-lg"></i>
             </button>
@@ -181,7 +202,7 @@ export default function DashboardLayout({
             {/* Tombol Lonceng Notifikasi dengan Badge Real-Time */}
             <button 
               onClick={() => setIsNotifOpen(true)}
-              className="relative text-gray-500 hover:text-amber-800 transition-colors focus:outline-none"
+              className="relative text-gray-500 hover:text-amber-900 transition-colors focus:outline-none"
             >
               <i className="fa-regular fa-bell text-xl"></i>
               {unreadCount > 0 && (
@@ -192,7 +213,7 @@ export default function DashboardLayout({
             </button>
 
             <div className="flex items-center gap-2 pl-4 border-l border-gray-200">
-              <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-sm">
+              <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-900 flex items-center justify-center font-bold text-sm">
                 {userName.charAt(0).toUpperCase()}
               </div>
               <span className="text-sm font-semibold text-gray-700 hidden sm:block">{userName}</span>
